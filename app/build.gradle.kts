@@ -33,9 +33,9 @@ android {
             val storeFileName = keystoreProps["storeFile"] ?: "profarm_release.jks"
             val resolvedStoreFile = if (file(storeFileName).exists()) file(storeFileName) else rootProject.file(storeFileName)
             storeFile = resolvedStoreFile.absoluteFile
-            storePassword = keystoreProps["storePassword"] ?: "ProFarm_Release_Key_2026_SecureVault!"
-            keyAlias = keystoreProps["keyAlias"] ?: "profarm_key"
-            keyPassword = keystoreProps["keyPassword"] ?: "ProFarm_Release_Key_2026_SecureVault!"
+            storePassword = keystoreProps["storePassword"] ?: System.getenv("PROFARM_STORE_PASSWORD") ?: ""
+            keyAlias = keystoreProps["keyAlias"] ?: System.getenv("PROFARM_KEY_ALIAS") ?: "profarm_key"
+            keyPassword = keystoreProps["keyPassword"] ?: System.getenv("PROFARM_KEY_PASSWORD") ?: ""
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true

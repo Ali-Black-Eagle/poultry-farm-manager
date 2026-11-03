@@ -22,14 +22,19 @@ object MultiDeviceSyncManager {
     /**
      * صدور بسته همگام‌سازی فشرده و امن جهت انتقال به دستگاه دیگر یا گوگل درایو.
      */
-    suspend fun createSecureSyncPackage(context: Context): String = withContext(Dispatchers.IO) {
+    suspend fun createSecureSyncPackage(context: Context, syncSecretKey: String? = null): String = withContext(Dispatchers.IO) {
         val rawJson = FullAppBackupManager.createFullBackupJson(context)
+        val passwordToUse = syncSecretKey?.toCharArray()
+        val encResult = AppCryptoManager.encrypt(rawJson, passwordToUse)
         val packageObj = JSONObject().apply {
-            put("version", 2)
+            put("version", 3)
             put("syncTimestampMillis", System.currentTimeMillis())
             put("deviceFingerprint", android.os.Build.MODEL)
-            put("encryptedPayload", Base64.getEncoder().encodeToString(rawJson.toByteArray(Charsets.UTF_8)))
-            put("checksum", AppCryptoManager.hashPin(rawJson).take(16))
+            put("ciphertext", encResult.ciphertextBase64)
+            put("iv", encResult.ivBase64)
+            put("salt", encResult.saltBase64)
+            put("iterations", encResult.iterations)
+            put("checksum", AppCryptoManager.hashPin(encResult.ciphertextBase64).take(32))
         }
         packageObj.toString(2)
     }
@@ -37,19 +42,35 @@ object MultiDeviceSyncManager {
     /**
      * دریافت و ادغام بسته همگام‌سازی با استراتژی Last-Write-Wins (LWW) بدون حذف داده‌های دیگر.
      */
-    suspend fun mergeSecureSyncPackage(context: Context, syncPackageStr: String): SyncResult = withContext(Dispatchers.IO) {
+    suspend fun mergeSecureSyncPackage(context: Context, syncPackageStr: String, syncSecretKey: String? = null): SyncResult = withContext(Dispatchers.IO) {
         try {
             val root = JSONObject(syncPackageStr)
-            val base64Payload = root.getString("encryptedPayload")
-            val rawJsonBytes = Base64.getDecoder().decode(base64Payload)
-            val rawJson = String(rawJsonBytes, Charsets.UTF_8)
+            val rawJson: String
 
-            val expectedChecksum = root.optString("checksum")
-            val actualChecksum = AppCryptoManager.hashPin(rawJson).take(16)
-            if (expectedChecksum.isBlank() || expectedChecksum != actualChecksum) {
+            if (root.has("ciphertext") && root.has("iv") && root.has("salt")) {
+                val ciphertext = root.getString("ciphertext")
+                val iv = root.getString("iv")
+                val salt = root.getString("salt")
+                val iterations = root.optInt("iterations", 600000)
+                val expectedChecksum = root.optString("checksum")
+                val actualChecksum = AppCryptoManager.hashPin(ciphertext).take(32)
+
+                if (expectedChecksum.isBlank() || expectedChecksum != actualChecksum) {
+                    return@withContext SyncResult(
+                        success = false,
+                        message = "خطا در اعتبارسنجی: بسته همگام‌سازی مخدوش شده است یا کلید تطابق ندارد."
+                    )
+                }
+                rawJson = AppCryptoManager.decrypt(ciphertext, iv, salt, syncSecretKey?.toCharArray(), iterations)
+            } else if (root.has("encryptedPayload")) {
+                // سازگاری با فرمت قدیمی
+                val base64Payload = root.getString("encryptedPayload")
+                val rawJsonBytes = Base64.getDecoder().decode(base64Payload)
+                rawJson = String(rawJsonBytes, Charsets.UTF_8)
+            } else {
                 return@withContext SyncResult(
                     success = false,
-                    message = "خطا در اعتبارسنجی: بسته همگام‌سازی مخدوش شده است یا کلید تطابق ندارد."
+                    message = "ساختار بسته همگام‌سازی نامعتبر است."
                 )
             }
 

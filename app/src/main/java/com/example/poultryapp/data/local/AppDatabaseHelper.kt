@@ -36,6 +36,11 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         _dbUpdateSignal.value = System.currentTimeMillis()
     }
 
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE flocks (
@@ -333,8 +338,8 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         }
         if (oldVersion < 6) {
             try {
-                db.execSQL("DELETE FROM flocks WHERE name = 'سالن ۱ - گوشتی راس' OR name = 'سالن ۲ - تخمگذار هایلاین';")
-                db.execSQL("DELETE FROM custom_breeds WHERE id <= 49;")
+                // Safeguard: Only clear legacy demo entries if they match exact default initial timestamps and demo flags
+                db.execSQL("DELETE FROM flocks WHERE (name = 'سالن ۱ - گوشتی راس' OR name = 'سالن ۲ - تخمگذار هایلاین') AND created_at_millis <= 1700000000000L;")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -835,11 +840,25 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
 
     fun deleteFlock(flockId: Long): Boolean {
         val db = writableDatabase
-        db.delete("feed_water_charges", "flock_id = ?", arrayOf(flockId.toString()))
-        db.delete("calendar_schedules", "flock_id = ?", arrayOf(flockId.toString()))
-        val rows = db.delete("flocks", "id = ?", arrayOf(flockId.toString()))
-        notifyDataChanged()
-        return rows > 0
+        db.beginTransaction()
+        return try {
+            val fIdStr = arrayOf(flockId.toString())
+            db.delete("feed_water_charges", "flock_id = ?", fIdStr)
+            db.delete("calendar_schedules", "flock_id = ?", fIdStr)
+            db.delete("flock_mortality_logs", "flock_id = ?", fIdStr)
+            db.delete("flock_observations", "flock_id = ?", fIdStr)
+            db.delete("egg_productions", "flock_id = ?", fIdStr)
+            db.delete("bird_transfers", "from_flock_id = ? OR to_flock_id = ?", arrayOf(flockId.toString(), flockId.toString()))
+            val rows = db.delete("flocks", "id = ?", fIdStr)
+            db.setTransactionSuccessful()
+            notifyDataChanged()
+            rows > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            db.endTransaction()
+        }
     }
 
     fun getAllFlocks(): List<Flock> {
@@ -2384,7 +2403,118 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         }
         root.put("rationPlans", rationArr)
 
-        // 13. Biosecurity Checks (Part 2)
+        // 11. Farm Contacts
+        val contactsArr = JSONArray()
+        val contactsCursor = db.rawQuery("SELECT * FROM farm_contacts ORDER BY id ASC", null)
+        contactsCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getLong(it.getColumnIndexOrThrow("id")))
+                    put("fullName", it.getString(it.getColumnIndexOrThrow("full_name")))
+                    val bnIdx = it.getColumnIndex("business_name")
+                    if (bnIdx != -1 && !it.isNull(bnIdx)) put("businessName", it.getString(bnIdx))
+                    put("category", it.getString(it.getColumnIndexOrThrow("category")))
+                    put("phonePrimary", it.getString(it.getColumnIndexOrThrow("phone_primary")))
+                    val psIdx = it.getColumnIndex("phone_secondary")
+                    if (psIdx != -1 && !it.isNull(psIdx)) put("phoneSecondary", it.getString(psIdx))
+                    val addrIdx = it.getColumnIndex("address")
+                    if (addrIdx != -1 && !it.isNull(addrIdx)) put("address", it.getString(addrIdx))
+                    val pcIdx = it.getColumnIndex("province_city")
+                    if (pcIdx != -1 && !it.isNull(pcIdx)) put("provinceCity", it.getString(pcIdx))
+                    put("balanceTomans", it.getDouble(it.getColumnIndexOrThrow("balance_tomans")))
+                    val ptnIdx = it.getColumnIndex("payment_terms_notes")
+                    if (ptnIdx != -1 && !it.isNull(ptnIdx)) put("paymentTermsNotes", it.getString(ptnIdx))
+                    put("ratingStars", it.getInt(it.getColumnIndexOrThrow("rating_stars")))
+                    put("createdAtMillis", it.getLong(it.getColumnIndexOrThrow("created_at_millis")))
+                }
+                contactsArr.put(o)
+            }
+        }
+        root.put("farmContacts", contactsArr)
+
+        // 12. Flock Mortality Logs
+        val mortArr = JSONArray()
+        val mortCursor = db.rawQuery("SELECT * FROM flock_mortality_logs ORDER BY id ASC", null)
+        mortCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getLong(it.getColumnIndexOrThrow("id")))
+                    put("flockId", it.getLong(it.getColumnIndexOrThrow("flock_id")))
+                    put("flockName", it.getString(it.getColumnIndexOrThrow("flock_name")))
+                    put("count", it.getInt(it.getColumnIndexOrThrow("count")))
+                    put("reason", it.getString(it.getColumnIndexOrThrow("reason")))
+                    val dhIdx = it.getColumnIndex("diagnosis_hint")
+                    if (dhIdx != -1 && !it.isNull(dhIdx)) put("diagnosisHint", it.getString(dhIdx))
+                    put("dateJalaliStr", it.getString(it.getColumnIndexOrThrow("date_jalali_str")))
+                    put("timestampMillis", it.getLong(it.getColumnIndexOrThrow("timestamp_millis")))
+                    val nIdx = it.getColumnIndex("notes")
+                    if (nIdx != -1 && !it.isNull(nIdx)) put("notes", it.getString(nIdx))
+                }
+                mortArr.put(o)
+            }
+        }
+        root.put("flockMortalityLogs", mortArr)
+
+        // 13. Flock Observations
+        val obsArr = JSONArray()
+        val obsCursor = db.rawQuery("SELECT * FROM flock_observations ORDER BY id ASC", null)
+        obsCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getLong(it.getColumnIndexOrThrow("id")))
+                    put("flockId", it.getLong(it.getColumnIndexOrThrow("flock_id")))
+                    put("flockName", it.getString(it.getColumnIndexOrThrow("flock_name")))
+                    put("note", it.getString(it.getColumnIndexOrThrow("note")))
+                    put("authorRole", it.getString(it.getColumnIndexOrThrow("author_role")))
+                    put("category", it.getString(it.getColumnIndexOrThrow("category")))
+                    put("dateJalaliStr", it.getString(it.getColumnIndexOrThrow("date_jalali_str")))
+                    put("timestampMillis", it.getLong(it.getColumnIndexOrThrow("timestamp_millis")))
+                }
+                obsArr.put(o)
+            }
+        }
+        root.put("flockObservations", obsArr)
+
+        // 14. Custom Feed Ingredients
+        val feedIngArr = JSONArray()
+        val feedIngCursor = db.rawQuery("SELECT * FROM custom_feed_ingredients ORDER BY name ASC", null)
+        feedIngCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getString(it.getColumnIndexOrThrow("id")))
+                    put("name", it.getString(it.getColumnIndexOrThrow("name")))
+                    put("category", it.getString(it.getColumnIndexOrThrow("category")))
+                    val eIdx = it.getColumnIndex("energy_kcal_kg")
+                    if (eIdx != -1 && !it.isNull(eIdx)) put("energyKcalKg", it.getDouble(eIdx))
+                    val cpIdx = it.getColumnIndex("crude_protein")
+                    if (cpIdx != -1 && !it.isNull(cpIdx)) put("crudeProtein", it.getDouble(cpIdx))
+                    val caIdx = it.getColumnIndex("calcium")
+                    if (caIdx != -1 && !it.isNull(caIdx)) put("calcium", it.getDouble(caIdx))
+                    val pIdx = it.getColumnIndex("available_phosphorus")
+                    if (pIdx != -1 && !it.isNull(pIdx)) put("availablePhosphorus", it.getDouble(pIdx))
+                    val mIdx = it.getColumnIndex("methionine")
+                    if (mIdx != -1 && !it.isNull(mIdx)) put("methionine", it.getDouble(mIdx))
+                    val lIdx = it.getColumnIndex("lysine")
+                    if (lIdx != -1 && !it.isNull(lIdx)) put("lysine", it.getDouble(lIdx))
+                    val naIdx = it.getColumnIndex("sodium")
+                    if (naIdx != -1 && !it.isNull(naIdx)) put("sodium", it.getDouble(naIdx))
+                    val cfIdx = it.getColumnIndex("crude_fiber")
+                    if (cfIdx != -1 && !it.isNull(cfIdx)) put("crudeFiber", it.getDouble(cfIdx))
+                    val fatIdx = it.getColumnIndex("fat")
+                    if (fatIdx != -1 && !it.isNull(fatIdx)) put("fat", it.getDouble(fatIdx))
+                    val ppkIdx = it.getColumnIndex("price_per_kg")
+                    if (ppkIdx != -1 && !it.isNull(ppkIdx)) put("pricePerKg", it.getDouble(ppkIdx))
+                    val descIdx = it.getColumnIndex("description")
+                    if (descIdx != -1 && !it.isNull(descIdx)) put("description", it.getString(descIdx))
+                    val caMillisIdx = it.getColumnIndex("created_at_millis")
+                    if (caMillisIdx != -1 && !it.isNull(caMillisIdx)) put("createdAtMillis", it.getLong(caMillisIdx))
+                }
+                feedIngArr.put(o)
+            }
+        }
+        root.put("customFeedIngredients", feedIngArr)
+
+        // 15. Biosecurity Checks
         val bioArr = JSONArray()
         val bioCursor = db.rawQuery("SELECT * FROM biosecurity_checks", null)
         bioCursor.use {
@@ -2578,6 +2708,51 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                             }
                             db.insert("flock_mortality_logs", null, cv)
                         }
+                    }
+                }
+
+                // 15. Flock Observations
+                if (root.has("flockObservations")) {
+                    val arr = root.getJSONArray("flockObservations")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val cv = ContentValues().apply {
+                            if (o.has("id") && o.getLong("id") > 0) put("id", o.getLong("id"))
+                            put("flock_id", o.getLong("flockId"))
+                            put("flock_name", o.getString("flockName"))
+                            put("note", o.getString("note"))
+                            put("author_role", o.optString("authorRole", "MANAGER"))
+                            put("category", o.optString("category", "OBSERVATION"))
+                            put("date_jalali_str", o.getString("dateJalaliStr"))
+                            put("timestamp_millis", o.getLong("timestampMillis"))
+                        }
+                        db.insertWithOnConflict("flock_observations", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
+                }
+
+                // 16. Custom Feed Ingredients
+                if (root.has("customFeedIngredients")) {
+                    val arr = root.getJSONArray("customFeedIngredients")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val cv = ContentValues().apply {
+                            put("id", o.getString("id"))
+                            put("name", o.getString("name"))
+                            put("category", o.getString("category"))
+                            if (o.has("energyKcalKg") && !o.isNull("energyKcalKg")) put("energy_kcal_kg", o.getDouble("energyKcalKg"))
+                            if (o.has("crudeProtein") && !o.isNull("crudeProtein")) put("crude_protein", o.getDouble("crudeProtein"))
+                            if (o.has("calcium") && !o.isNull("calcium")) put("calcium", o.getDouble("calcium"))
+                            if (o.has("availablePhosphorus") && !o.isNull("availablePhosphorus")) put("available_phosphorus", o.getDouble("availablePhosphorus"))
+                            if (o.has("methionine") && !o.isNull("methionine")) put("methionine", o.getDouble("methionine"))
+                            if (o.has("lysine") && !o.isNull("lysine")) put("lysine", o.getDouble("lysine"))
+                            if (o.has("sodium") && !o.isNull("sodium")) put("sodium", o.getDouble("sodium"))
+                            if (o.has("crudeFiber") && !o.isNull("crudeFiber")) put("crude_fiber", o.getDouble("crudeFiber"))
+                            if (o.has("fat") && !o.isNull("fat")) put("fat", o.getDouble("fat"))
+                            if (o.has("pricePerKg") && !o.isNull("pricePerKg")) put("price_per_kg", o.getDouble("pricePerKg"))
+                            if (o.has("description") && !o.isNull("description")) put("description", o.getString("description"))
+                            if (o.has("createdAtMillis") && !o.isNull("createdAtMillis")) put("created_at_millis", o.getLong("createdAtMillis"))
+                        }
+                        db.insertWithOnConflict("custom_feed_ingredients", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
                     }
                 }
 
@@ -2922,6 +3097,51 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                     }
                 } else {
                     ensureDefaultBiosecurityChecks(db)
+                }
+
+                // 15. Flock Observations
+                if (root.has("flockObservations")) {
+                    val arr = root.getJSONArray("flockObservations")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val cv = ContentValues().apply {
+                            if (o.has("id") && o.getLong("id") > 0) put("id", o.getLong("id"))
+                            put("flock_id", o.getLong("flockId"))
+                            put("flock_name", o.getString("flockName"))
+                            put("note", o.getString("note"))
+                            put("author_role", o.optString("authorRole", "MANAGER"))
+                            put("category", o.optString("category", "OBSERVATION"))
+                            put("date_jalali_str", o.getString("dateJalaliStr"))
+                            put("timestamp_millis", o.getLong("timestampMillis"))
+                        }
+                        db.insertWithOnConflict("flock_observations", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
+                }
+
+                // 16. Custom Feed Ingredients
+                if (root.has("customFeedIngredients")) {
+                    val arr = root.getJSONArray("customFeedIngredients")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val cv = ContentValues().apply {
+                            put("id", o.getString("id"))
+                            put("name", o.getString("name"))
+                            put("category", o.getString("category"))
+                            if (o.has("energyKcalKg") && !o.isNull("energyKcalKg")) put("energy_kcal_kg", o.getDouble("energyKcalKg"))
+                            if (o.has("crudeProtein") && !o.isNull("crudeProtein")) put("crude_protein", o.getDouble("crudeProtein"))
+                            if (o.has("calcium") && !o.isNull("calcium")) put("calcium", o.getDouble("calcium"))
+                            if (o.has("availablePhosphorus") && !o.isNull("availablePhosphorus")) put("available_phosphorus", o.getDouble("availablePhosphorus"))
+                            if (o.has("methionine") && !o.isNull("methionine")) put("methionine", o.getDouble("methionine"))
+                            if (o.has("lysine") && !o.isNull("lysine")) put("lysine", o.getDouble("lysine"))
+                            if (o.has("sodium") && !o.isNull("sodium")) put("sodium", o.getDouble("sodium"))
+                            if (o.has("crudeFiber") && !o.isNull("crudeFiber")) put("crude_fiber", o.getDouble("crudeFiber"))
+                            if (o.has("fat") && !o.isNull("fat")) put("fat", o.getDouble("fat"))
+                            if (o.has("pricePerKg") && !o.isNull("pricePerKg")) put("price_per_kg", o.getDouble("pricePerKg"))
+                            if (o.has("description") && !o.isNull("description")) put("description", o.getString("description"))
+                            if (o.has("createdAtMillis") && !o.isNull("createdAtMillis")) put("created_at_millis", o.getLong("createdAtMillis"))
+                        }
+                        db.insertWithOnConflict("custom_feed_ingredients", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
                 }
 
                 db.setTransactionSuccessful()

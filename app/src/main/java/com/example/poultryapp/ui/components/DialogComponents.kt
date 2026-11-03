@@ -61,7 +61,7 @@ fun parsePersianOrEnglishInt(str: String): Int? {
     val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
     val arabicDigits = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
     val sb = StringBuilder()
-    for (ch in str) {
+    for (ch in str.trim()) {
         val pIdx = persianDigits.indexOf(ch)
         if (pIdx >= 0) {
             sb.append(pIdx)
@@ -78,6 +78,35 @@ fun parsePersianOrEnglishInt(str: String): Int? {
     }
     return sb.toString().toIntOrNull()
 }
+
+fun parsePersianOrEnglishDouble(str: String): Double? {
+    val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+    val arabicDigits = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
+    val sb = StringBuilder()
+    var hasDot = false
+    for (ch in str.trim()) {
+        val pIdx = persianDigits.indexOf(ch)
+        if (pIdx >= 0) {
+            sb.append(pIdx)
+            continue
+        }
+        val aIdx = arabicDigits.indexOf(ch)
+        if (aIdx >= 0) {
+            sb.append(aIdx)
+            continue
+        }
+        if (ch in '0'..'9') {
+            sb.append(ch)
+        } else if ((ch == '.' || ch == '/' || ch == '٫') && !hasDot) {
+            sb.append('.')
+            hasDot = true
+        }
+    }
+    return sb.toString().toDoubleOrNull()
+}
+
+fun String.toSafeDoubleOrNull(): Double? = parsePersianOrEnglishDouble(this)
+fun String.toSafeIntOrNull(): Int? = parsePersianOrEnglishInt(this)
 
 fun generateDefaultFlockName(breed: String, existingFlocks: List<Flock>): String {
     val cleanBreed = breed.trim()
@@ -614,7 +643,7 @@ fun FlockFormDialog(
                                     subGroups,
                                     isFeedEnabled,
                                     isWaterEnabled,
-                                    customTempInput.toDoubleOrNull()
+                                    customTempInput.toSafeDoubleOrNull()
                                 )
                             }
                         },
@@ -780,12 +809,12 @@ fun FlockTemperatureDialog(
                 ) {
                     Button(
                         onClick = {
-                            val parsed = tempInput.toDoubleOrNull()
+                            val parsed = tempInput.toSafeDoubleOrNull()
                             onConfirm(parsed)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        enabled = tempInput.toDoubleOrNull() != null
+                        enabled = tempInput.toSafeDoubleOrNull() != null
                     ) {
                         Text("ثبت و اعمال دمای سالن")
                     }
@@ -1026,8 +1055,8 @@ fun WarehouseItemDialog(
                 )
 
                 // Live Total Inventory Value Card
-                val liveStock = stockText.toDoubleOrNull() ?: 0.0
-                val livePrice = pricePerUnitText.toDoubleOrNull() ?: 0.0
+                val liveStock = stockText.toSafeDoubleOrNull() ?: 0.0
+                val livePrice = pricePerUnitText.toSafeDoubleOrNull() ?: 0.0
                 val liveTotalValue = liveStock * livePrice
                 if (liveStock > 0.0 && livePrice > 0.0) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1168,9 +1197,9 @@ fun WarehouseItemDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            val parsedStock = stockText.toDoubleOrNull() ?: 0.0
-                            val parsedThreshold = if (isMinAlertEnabled) (minThresholdText.toDoubleOrNull() ?: 30.0) else 0.0
-                            val parsedPrice = pricePerUnitText.toDoubleOrNull() ?: 0.0
+                            val parsedStock = stockText.toSafeDoubleOrNull() ?: 0.0
+                            val parsedThreshold = if (isMinAlertEnabled) (minThresholdText.toSafeDoubleOrNull() ?: 30.0) else 0.0
+                            val parsedPrice = pricePerUnitText.toSafeDoubleOrNull() ?: 0.0
                             if (name.isNotBlank()) {
                                 onSave(
                                     WarehouseItem(
@@ -1331,7 +1360,7 @@ fun ChargeInputDialog(
                 ) {
                     Button(
                         onClick = {
-                            val parsed = amountText.toDoubleOrNull()
+                            val parsed = amountText.toSafeDoubleOrNull()
                             if (parsed != null && parsed > 0.0) {
                                 onConfirm(parsed, discardLeftover)
                             }
@@ -2602,17 +2631,17 @@ fun RecordEggDialog(
     val selectedFlocks = flocks.filter { it.id in selectedFlockIds }
     val totalBirds = selectedFlocks.sumOf { it.effectiveBirdCount }
 
-    val fertile = fertileText.toIntOrNull() ?: 0
-    val tableEgg = tableEggText.toIntOrNull() ?: 0
+    val fertile = fertileText.toSafeIntOrNull() ?: 0
+    val tableEgg = tableEggText.toSafeIntOrNull() ?: 0
     val healthy = fertile + tableEgg
-    val broken = brokenText.toIntOrNull() ?: 0
-    val dirty = dirtyText.toIntOrNull() ?: 0
-    val doubleYolk = doubleYolkText.toIntOrNull() ?: 0
+    val broken = brokenText.toSafeIntOrNull() ?: 0
+    val dirty = dirtyText.toSafeIntOrNull() ?: 0
+    val doubleYolk = doubleYolkText.toSafeIntOrNull() ?: 0
     val totalEggs = healthy + broken + dirty + doubleYolk
 
     val autoTrays = if (totalEggs > 0) totalEggs.toDouble() / 30.0 else 0.0
-    val trayCount = customTrayCountText.toDoubleOrNull() ?: autoTrays
-    val trayGrossGrams = trayGrossWeightText.toDoubleOrNull()
+    val trayCount = customTrayCountText.toSafeDoubleOrNull() ?: autoTrays
+    val trayGrossGrams = trayGrossWeightText.toSafeDoubleOrNull()
     // Standard 30-egg empty paper tray is 50 grams
     val netAverageEggWeightGrams = if (trayGrossGrams != null && trayGrossGrams > 50.0) {
         (trayGrossGrams - 50.0) / 30.0
@@ -3685,7 +3714,7 @@ fun ConsumeStockDialog(
     }
     var notes by remember { mutableStateOf("") }
 
-    val amount = amountText.toDoubleOrNull() ?: 0.0
+    val amount = amountText.toSafeDoubleOrNull() ?: 0.0
     val totalCost = amount * item.pricePerUnit
     val isValid = amount > 0.0 && amount <= item.currentStock
 
@@ -4203,7 +4232,7 @@ fun AddManualTransactionDialog(
     var notes by remember { mutableStateOf("") }
     var categoryExpanded by remember { mutableStateOf(false) }
 
-    val amount = amountText.toDoubleOrNull() ?: 0.0
+    val amount = amountText.toSafeDoubleOrNull() ?: 0.0
     val isValid = title.isNotBlank() && amount > 0.0
 
     Dialog(onDismissRequest = onDismiss) {
