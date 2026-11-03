@@ -1,0 +1,24 @@
+{
+  "version": 4,
+  "company": "ProFarm",
+  "exportTimestamp": 1790294400000,
+  "customBreeds": [],
+  "flocks": [],
+  "appSettings": {
+    "farm_province": "",
+    "farm_city": "",
+    "farm_latitude": "",
+    "farm_longitude": "",
+    "manual_temp_celsius": null,
+    "is_online_weather_enabled": "true",
+    "low_threshold": "15.0",
+    "alert_feed_water": "true",
+    "alert_calendar": "true",
+    "alert_morning": "true",
+    "morning_hour": "7",
+    "morning_minute": "0"
+  },
+  "calendarSchedules": [],
+  "warehouseItems": [],
+  "feedWaterCharges": []
+}

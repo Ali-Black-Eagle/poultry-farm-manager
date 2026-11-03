@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FCE4EC"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Vitamin Capsule Left Half -->
+    <path
+        android:fillColor="#E91E63"
+        android:pathData="M16,16c-4.4,4.4 -4.4,11.6 0,16l6,-6 -6,-6z"/>
+    <!-- Vitamin Capsule Right Half -->
+    <path
+        android:fillColor="#FF4081"
+        android:pathData="M32,32c4.4,-4.4 4.4,-11.6 0,-16l-6,6 6,6z"/>
+    <!-- Capsule Seam -->
+    <path
+        android:fillColor="#C2185B"
+        android:pathData="M21,21l6,6 -2,2 -6,-6z"/>
+    <!-- Star Sparkle of Vitality -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M33,13l1,2 2,1 -2,1 -1,2 -1,-2 -2,-1 2,-1z"/>
+</vector>
+

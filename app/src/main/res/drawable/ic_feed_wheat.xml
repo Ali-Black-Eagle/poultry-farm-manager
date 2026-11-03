@@ -1,0 +1,42 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFFDE7"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Wheat stem -->
+    <path
+        android:fillColor="#D7CCC8"
+        android:pathData="M23,12h2v30h-2z"/>
+    <!-- Wheat grains/spikes -->
+    <path
+        android:fillColor="#FFA000"
+        android:pathData="M24,8c-1.5,2 -2,4 0,7 2,-3 1.5,-5 0,-7z"/>
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M20,13c-3,1 -4,3 -2,6 3,-1 4,-3 2,-6z"/>
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M28,15c3,1 4,3 2,6 -3,-1 -4,-3 -2,-6z"/>
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M19,19c-3,1 -4,3 -2,6 3,-1 4,-3 2,-6z"/>
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M29,21c3,1 4,3 2,6 -3,-1 -4,-3 -2,-6z"/>
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M18,25c-3,1 -4,3 -2,6 3,-1 4,-3 2,-6z"/>
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M30,27c3,1 4,3 2,6 -3,-1 -4,-3 -2,-6z"/>
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M19,31c-3,1 -4,3 -2,6 3,-1 4,-3 2,-6z"/>
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M29,33c3,1 4,3 2,6 -3,-1 -4,-3 -2,-6z"/>
+</vector>
+

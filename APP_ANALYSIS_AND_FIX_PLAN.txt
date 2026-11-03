@@ -1,0 +1,391 @@
+================================================================================
+ POULTRY FARM ANDROID APP - ANALYSIS REPORT AND FIX PLAN
+================================================================================
+Date of analysis : 2026-11-02
+Scope            : Static review of build config, manifest, security, data,
+                   alarms/widgets, networking, tests, and project hygiene.
+Rule followed    : NO existing file or code was modified. This file is the only
+                   artifact created.
+
+App facts (from files)
+  - Package: namespace com.example.poultryapp, applicationId com.profarm.poultryapp
+  - Kotlin 2.3.20, AGP 9.0.1, Gradle 9.1.0, compileSdk 36, targetSdk 35, minSdk 26
+  - Jetpack Compose UI, raw SQLiteOpenHelper (DB version 12), no Room
+  - ~151 Kotlin files; 9 unit-test files, 1 instrumented test
+  - Features: flocks, feed/water, eggs, warehouse, finance, calendar alarms,
+    widgets, weather (Open-Meteo), Persian voice assistant, breeding game,
+    encrypted backup and device-to-device sync
+
+LIMITS OF THIS ANALYSIS (read first)
+  - The app could NOT be built or tested here: `gradlew` fails because Java is
+    not installed / JAVA_HOME is not set in this environment.
+  - The test results below come from the last saved report
+    (app/build/reports/tests/testDebugUnitTest, written 2026-11-01 21:01).
+    They may be stale; re-run after JDK setup to confirm.
+  - Findings marked [VERIFY] were inferred from partial reading and must be
+    confirmed in code before fixing.
+  - The app was not run on a device or emulator. No UI/runtime bugs were
+    observed first-hand.
+  - This folder is not a Git repository, so there is no history or easy undo.
+
+
+================================================================================
+ 1. FINDINGS (ordered by severity)
+================================================================================
+
+--------------------------------------------------------------------------------
+ CRITICAL
+--------------------------------------------------------------------------------
+
+C1. Release signing passwords are hardcoded in source
+    Where : app/build.gradle.kts (signingConfigs.release)
+    What  : storePassword and keyPassword are written in plain text. Keystore
+            files app/profarm_release.jks and app/poultry_release.jks sit inside
+            the project folder. No .gitignore rule excludes *.jks or keystore
+            properties, so the first `git add .` would publish the signing key
+            and password.
+    Impact: Anyone with the folder can sign apps as the publisher. The password
+            must now be treated as exposed.
+    Extra : poultry_release.jks is not referenced by the build (stray file).
+
+C2. Backup encryption key is embedded in the app
+    Where : security/AppCryptoManager.kt (MASTER_APPLICATION_SEED)
+    What  : Backups are AES-256-GCM encrypted, but the password is a constant
+            string in the code, and it is the same for every user. PBKDF2 uses
+            only 10,000 iterations.
+    Impact: The encryption gives no real confidentiality. Anyone who unpacks
+            the APK can decrypt any backup file (farm finances, flock data).
+            The documentation in the file presents it as strong protection.
+
+--------------------------------------------------------------------------------
+ HIGH
+--------------------------------------------------------------------------------
+
+H1. Restore is not atomic and can leave data half-restored
+    Where : data/backup/FullAppBackupManager.kt (restoreFullBackup)
+    What  : The database import runs in its own transaction, then two
+            SharedPreferences files are cleared and rewritten afterwards. A
+            failure or crash in between leaves new database data with old or
+            empty game progress. Preferences are cleared before their content
+            is validated.
+    Impact: Silent data inconsistency after a restore or a sync.
+
+H2. Sync package integrity check is weak and can be skipped
+    Where : data/sync/MultiDeviceSyncManager.kt (mergeSecureSyncPackage)
+    What  : The checksum is the first 16 hex characters of an unsalted SHA-256.
+            If the "checksum" field is blank, the check is skipped entirely.
+            There is no authentication of the sender. The success message says
+            data is "merged" (Last-Write-Wins) but the code calls the full
+            restore path. [VERIFY whether importDatabaseFromJson replaces or
+            merges rows.]
+    Impact: A crafted sync file can overwrite local farm data; users may lose
+            local records believing a merge happened.
+
+H3. PIN and recovery key are weakly protected
+    Where : security/AppCryptoManager.kt (hashPin, generateRecoveryKey)
+    What  : PIN is hashed with a single unsalted SHA-256. The recovery key is
+            6 digits (900,000 possibilities).
+    Impact: PIN can be brute-forced instantly if the database or a backup is
+            read. [VERIFY where the PIN hash is stored and whether attempts
+            are rate-limited.]
+
+H4. Release alarms can fail silently (exact alarm permission)
+    Where : receiver/AlarmScheduler.kt, AndroidManifest.xml
+    What  : The app declares SCHEDULE_EXACT_ALARM and calls
+            setExactAndAllowWhileIdle without ever calling
+            canScheduleExactAlarms() or sending the user to the permission
+            screen. A SecurityException is caught and only printed with
+            printStackTrace.
+    Impact: On Android 12+ (and by default for new installs on 14+) reminders
+            for feeding, medication and charges may never fire, with no error
+            shown. This is a core feature of the app.
+
+H5. Auto-backup is enabled with no rules
+    Where : AndroidManifest.xml (allowBackup=true),
+            res/xml/backup_rules.xml and data_extraction_rules.xml (templates
+            with a leftover TODO)
+    What  : The whole app data, including the SQLite database, is eligible for
+            cloud/device-transfer backup unencrypted by the app.
+    Impact: Farm data, PIN hash and settings leave the device in an
+            uncontrolled way; behavior may conflict with the app's own backup.
+
+H6. 13 of 145 unit tests failed in the last saved run (91% pass)
+    Failing tests:
+      ChallengerAdversarialEdgeStressTest
+        - testAdversarial05_AcidifierVsAscitesSafetyShield
+        - testAdversarial06_ClinicalDifferentialSyndromeDiagnostics
+        - testAdversarial10_EconomicEpefAndBreakEvenFormulas
+        - testAdversarial11_EarlyAnomalyWarningWaterDrop
+      MultiTurnSlotFillingTest
+        - testMultiTurn_PromptAndFill
+        - testSemanticSearchIntegration
+      VoiceIntelligenceUnitTest
+        - testFarmConversationalAiEngine_PoultryAdvisoryQuestions
+        - testFlockFeedAndWaterTrackingCommands
+        - testFlockTemperatureAdjustmentDoesNotTriggerBreedCatalog
+        - testLocalPoultryAiAgent_SynchronizedSemanticIntents
+        - testLocalPoultryAiAgent_TurnProcessing
+        - testSuperVoiceIntelligence_InteractiveClarificationDialogue
+        - testVoiceIntentParser_MedicationWithdrawalQuery
+    Impact: PROJECT.md states milestones are DONE with 100% pass; the saved
+            report contradicts that. Failures touch voice commands, clinical
+            diagnosis and economics calculations, so wrong answers for users
+            are possible. Root cause per test is unknown until re-run.
+
+--------------------------------------------------------------------------------
+ MEDIUM
+--------------------------------------------------------------------------------
+
+M1. FileProvider exposes whole directories
+    Where : res/xml/file_paths.xml
+    What  : cache, external-cache and files roots are all shared with path ".".
+    Impact: Any file the app places there (backups, database copies, photos)
+            can be shared by URI. Narrow to a dedicated subfolder.
+
+M2. Database upgrade steps can delete user data
+    Where : data/local/AppDatabaseHelper.kt (onUpgrade)
+    What  : Migrations run `DELETE FROM flocks WHERE name = ...`,
+            `DELETE FROM custom_breeds WHERE id <= 49`, and delete saved
+            settings values. These were clean-up steps for old seed data but
+            could remove real user rows that share those names or IDs.
+    Also  : Flock deletion removes child tables by separate statements
+            (lines ~778-780); [VERIFY] it is wrapped in one transaction and
+            that no other tables keep orphan rows.
+
+M3. Background work uses unmanaged coroutine scopes
+    Where : widget/FarmStatusWidgetProvider.kt, PoultryApplication.kt,
+            receiver/BootReceiver.kt
+    What  : `CoroutineScope(Dispatchers.IO).launch` is created per call. The
+            boot receiver correctly uses goAsync(); the widget provider does
+            not, so the process can be stopped before the widget finishes
+            updating.
+
+M4. Errors are swallowed with printStackTrace
+    Where : AlarmScheduler, BootReceiver, MainViewModel, SettingsScreen,
+            FullAppBackupManager, LiveFeedWaterNotificationManager and more
+    Impact: Failures (backup, alarms, settings) are invisible to the user and
+            to the developer; there is no logging or crash reporting.
+
+M5. Documentation says "100% offline" but the app uses the network
+    Where : PROJECT.md vs AndroidManifest.xml (INTERNET, location) and
+            service/WeatherAndLocationService.kt (Open-Meteo HTTPS calls)
+    Impact: Misleading for users and for any privacy statement. The farm
+            coordinates are sent to a third-party API. Weather is already
+            optional (isOnlineWeatherEnabled); the docs and any store listing
+            should state this.
+
+M6. Release shrinking is largely disabled by keep rules
+    Where : app/proguard-rules.pro
+    What  : `-keep class ... { *; }` for data, engine, security, voice, ui,
+            receiver, widget and more. R8 can neither shrink nor obfuscate
+            most of the app, including the security package.
+    Impact: Larger APK, easier reverse-engineering (which also makes C2 worse).
+
+M7. Build is tied to one machine's setup
+    Where : gradle.properties, local.properties, environment
+    What  : org.gradle.jvmargs hardcodes a SOCKS proxy (127.0.0.1:10808). If
+            that proxy is not running, Gradle cannot reach the network. No
+            JDK is available on PATH here (gradlew fails). Release build always
+            requires the keystore file to exist.
+
+M8. Very large single files hurt maintainability and startup
+    Sizes : AppDatabaseHelper.kt 3,264 lines; VoiceAssistantSheet.kt 2,610
+            lines; MainViewModel.kt 1,346 lines; several data catalogs of
+            100-300 KB each (SideQuestsData.kt, DiseaseCatalog.kt, stage files).
+    Impact: Hard to review and test; large static Kotlin data objects add to
+            class-load time and APK size. [VERIFY] startup time on a low-end
+            device and whether DB calls happen on the main thread (MainViewModel
+            calls AppDatabaseHelper directly in a few places).
+
+--------------------------------------------------------------------------------
+ LOW
+--------------------------------------------------------------------------------
+
+L1. Version info is inconsistent: versionName "1.0", versionCode 1, but backups
+    record appVersion "3.2.1-Cloud" (hardcoded string).
+L2. Lint is relaxed: checkReleaseBuilds=false and abortOnError=false, so lint
+    problems never block a release. No lint report exists to review.
+L3. Namespace (com.example.poultryapp) differs from applicationId
+    (com.profarm.poultryapp). Valid, but "com.example" is a placeholder name.
+L4. targetSdk is 35 while compileSdk is 36. [VERIFY] current Google Play target
+    API requirement before publishing.
+L5. Permissions to review: WAKE_LOCK, ACCESS_FINE_LOCATION (coarse may be
+    enough for weather). [VERIFY] RECORD_AUDIO is requested at runtime before
+    voice input; MainActivity only requests POST_NOTIFICATIONS.
+L6. Weather HTTP reader is not closed in a finally/use block on failure paths.
+L7. Project folder holds clutter: scratch/, build/, .kotlin/, two long
+    recommendation .txt files, and an unused keystore.
+L8. Test coverage gaps: no tests for database migrations, backup/restore,
+    sync, crypto, alarm scheduling, or widgets; only one instrumented UI test.
+
+
+================================================================================
+ 2. FIX PLAN
+================================================================================
+
+Order matters: set up a safe, testable base first, then fix security and data
+loss risks, then reliability, then cleanup.
+
+--------------------------------------------------------------------------------
+ PHASE 0 - Safety net and build environment (do first)
+--------------------------------------------------------------------------------
+ 0.1 Copy the whole project folder to a backup location (or `git init` and make
+     a baseline commit WITHOUT keystores, after step 1.1 below).
+ 0.2 Install JDK 17 (matches jvmToolchain 17) and set JAVA_HOME. Confirm
+     `gradlew --version` works.
+ 0.3 Make the SOCKS proxy in gradle.properties optional (move it to the user's
+     ~/.gradle/gradle.properties).
+ 0.4 Run `gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` and
+     save results as the real baseline. Confirm or update the 13 failures.
+ Acceptance: debug build succeeds; baseline test and lint reports exist.
+
+--------------------------------------------------------------------------------
+ PHASE 1 - Secrets and signing (C1)
+--------------------------------------------------------------------------------
+ 1.1 Add *.jks, *.keystore and keystore.properties to .gitignore.
+ 1.2 Move signing passwords to a git-ignored keystore.properties (or
+     environment variables); read them in build.gradle.kts; build must still
+     work without them for debug.
+ 1.3 Treat the old password as compromised. Decide: keep the current key
+     (only if it was never shared or published) or create a new one. If the app
+     is already published under this key, use Play App Signing / key upgrade
+     instead of simply replacing it.
+ 1.4 Move both .jks files out of the project folder; delete or archive the
+     unused poultry_release.jks after confirming it is not needed.
+ Acceptance: no password or keystore in the repo tree; assembleRelease works
+ using external credentials.
+
+--------------------------------------------------------------------------------
+ PHASE 2 - Backup encryption, PIN, sync security (C2, H2, H3)
+--------------------------------------------------------------------------------
+ 2.1 Backup key: derive it from a user-chosen backup password (random salt per
+     file, at least 600,000 PBKDF2-SHA256 iterations or use Argon2-like
+     parameters supported on Android), or use Android Keystore for
+     on-device-only backups. Store KDF parameters in the file header.
+ 2.2 Keep a legacy decrypt path so existing backups made with the old built-in
+     seed can still be restored; then re-encrypt on next backup. Add a visible
+     "old format" notice.
+ 2.3 PIN: store salted slow hash (PBKDF2 or similar) with per-user salt; add
+     attempt limiting with increasing delay; migrate old SHA-256 hashes on the
+     next successful login. Longer recovery key (e.g. 12+ chars from a larger
+     alphabet) or tie recovery to the backup password.
+ 2.4 Sync: make the checksum mandatory (reject blank), use an HMAC or AEAD tag
+     with a key from a pairing code, and show the user what will change before
+     applying. Decide and document replace vs merge; fix the success message to
+     match the real behavior.
+ Acceptance: unit tests for encrypt/decrypt round trip, wrong password, tampered
+ file, legacy-format restore, blank-checksum rejection, PIN migration.
+
+--------------------------------------------------------------------------------
+ PHASE 3 - Data integrity (H1, M2, H5, M1)
+--------------------------------------------------------------------------------
+ 3.1 Restore: validate the full backup first (parse everything, check version),
+     then apply database and both preference files as one unit; on any error
+     restore the previous state (snapshot before apply) and report a clear
+     error.
+ 3.2 Migrations: replace name/ID-based deletes with a guard that only removes
+     rows proven to be old seed data (e.g. flag column or exact match of all
+     seed fields). Add migration tests from every old version to 12.
+ 3.3 Wrap flock deletion and other multi-table writes in transactions; enable
+     PRAGMA foreign_keys with cascades where schema allows.
+ 3.4 Auto-backup: either set allowBackup="false" or write real include/exclude
+     rules (exclude PIN, tokens, caches). Remove the leftover TODO.
+ 3.5 FileProvider: share only a dedicated subfolder (e.g. cache/backups/).
+ Acceptance: interrupted-restore test leaves data unchanged; migration tests
+ pass; manual restore on a device with real data preserved.
+
+--------------------------------------------------------------------------------
+ PHASE 4 - Reliability of reminders, widgets, errors (H4, M3, M4)
+--------------------------------------------------------------------------------
+ 4.1 Alarms: check canScheduleExactAlarms() before scheduling; if not allowed,
+     show an in-app prompt that opens the exact-alarm settings page, and fall
+     back to inexact alarms with a visible notice. Re-check when the app
+     returns to the foreground. Consider whether USE_EXACT_ALARM is appropriate
+     (it has store policy limits; confirm before choosing).
+ 4.2 Boot/update: keep rescheduling in BootReceiver; also reschedule after
+     the exact-alarm permission is granted (ACTION_SCHEDULE_EXACT_ALARM_
+     PERMISSION_STATE_CHANGED).
+ 4.3 Widgets: use goAsync() (or WorkManager) for the status widget update.
+ 4.4 Replace printStackTrace with a small logging helper and user-visible error
+     states for backup, restore, alarm and settings failures.
+ 4.5 Check RECORD_AUDIO is requested with a rationale before the voice sheet
+     starts listening; handle denial gracefully (L5).
+ Acceptance: on API 31, 33, 34/35 emulators a reminder fires after permission
+ is granted and after reboot; denial shows a message instead of failing silently.
+
+--------------------------------------------------------------------------------
+ PHASE 5 - Failing tests and domain correctness (H6)
+--------------------------------------------------------------------------------
+ 5.1 For each of the 13 tests, decide whether the test or the code is wrong
+     (compare with PROJECT.md contracts). Fix root causes, not expected values
+     alone.
+ 5.2 Priority order: clinical diagnosis (06), economics formulas (10), anomaly
+     alert (11), acidifier vs ascites safety (05), then voice/slot-filling tests.
+ 5.3 Have a poultry veterinarian review diagnosis, dosage and withdrawal-period
+     outputs before release; software tests cannot confirm medical accuracy.
+ Acceptance: all unit tests pass; no test was deleted or loosened without a
+ written reason.
+
+--------------------------------------------------------------------------------
+ PHASE 6 - Release hardening and docs (M5, M6, L1-L4)
+--------------------------------------------------------------------------------
+ 6.1 Narrow ProGuard keep rules to what reflection/serialization needs; build
+     release and run the full app to catch missing keeps.
+ 6.2 Turn lint back on for release (checkReleaseBuilds=true, abortOnError=true)
+     after fixing or baselining current issues.
+ 6.3 Single source of truth for version (derive backup appVersion from
+     versionName); bump versionCode per release.
+ 6.4 Update PROJECT.md: state that weather uses the network (optional), list
+     permissions and why, and correct the test status.
+ 6.5 Pick a real package/applicationId before first publication (changing it
+     later creates a different app).
+ 6.6 Check the current Play target API requirement and update targetSdk.
+ 6.7 Remove scratch/ and clutter from the project root (move, don't delete,
+     until reviewed).
+ Acceptance: release APK builds, installs, and passes a smoke test; lint clean
+ or baselined.
+
+--------------------------------------------------------------------------------
+ PHASE 7 - Structure and performance (M8, L8) - after the above
+--------------------------------------------------------------------------------
+ 7.1 Profile cold start on a low-end device; move heavy catalogs to assets or
+     lazy loading if they dominate.
+ 7.2 Confirm all database access runs off the main thread (add StrictMode in
+     debug builds to catch violations).
+ 7.3 Split AppDatabaseHelper, VoiceAssistantSheet and MainViewModel into
+     smaller units; consider moving to Room with migration tests.
+ 7.4 Add instrumented tests for main flows (add flock, record feed/eggs,
+     backup then restore, alarm creation).
+
+
+================================================================================
+ 3. SUGGESTED EXECUTION ORDER AND EFFORT
+================================================================================
+  Phase 0   0.5 day   Environment and baseline
+  Phase 1   0.5 day   Secrets and signing
+  Phase 2   2-3 days  Encryption, PIN, sync
+  Phase 3   2 days    Restore, migrations, backup rules
+  Phase 4   1-2 days  Alarms, widgets, errors, permissions
+  Phase 5   2-4 days  Failing tests (depends on root causes)
+  Phase 6   1 day     Release hardening and docs
+  Phase 7   open      Refactoring and performance
+  (Estimates are rough, for one developer.)
+
+
+================================================================================
+ 4. DECISIONS NEEDED FROM THE OWNER
+================================================================================
+  1. Is the current release key already used for a published app or shared with
+     anyone? (decides keep vs replace in Phase 1)
+  2. Should backups be protected by a user password, or only by the device
+     (Android Keystore)? (Phase 2)
+  3. Should sync merge records or replace all data? (Phase 2)
+  4. Should Android cloud auto-backup stay on? (Phase 3)
+  5. Is exact-alarm timing required, or are slightly delayed reminders fine?
+     (Phase 4)
+  6. Is Play Store publication planned? If yes, the package name, target API
+     and data-safety declarations must be settled first.
+
+================================================================================
+ END OF REPORT
+================================================================================

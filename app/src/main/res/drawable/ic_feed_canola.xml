@@ -1,0 +1,33 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFFDE7"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Yellow petals -->
+    <path
+        android:fillColor="#FDD835"
+        android:pathData="M24,12c2.5,-3 6.5,-3 9,0 2.5,3 2.5,7 0,10 -2.5,3 -6.5,3 -9,0 -2.5,-3 -2.5,-7 0,-10z"/>
+    <path
+        android:fillColor="#FBC02D"
+        android:pathData="M15,21c-3,-2.5 -3,-6.5 0,-9 3,-2.5 7,-2.5 10,0 3,2.5 3,6.5 0,9 -3,2.5 -7,2.5 -10,0z"/>
+    <path
+        android:fillColor="#F57F17"
+        android:pathData="M24,26c-2.5,3 -6.5,3 -9,0 -2.5,-3 -2.5,-7 0,-10 2.5,-3 6.5,-3 9,0 2.5,3 2.5,7 0,10z"/>
+    <path
+        android:fillColor="#FBC02D"
+        android:pathData="M33,17c3,2.5 3,6.5 0,9 -3,2.5 -7,2.5 -10,0 -3,-2.5 -3,-6.5 0,-9 3,-2.5 7,-2.5 10,0z"/>
+    <!-- Small dark canola meal seeds -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M18,34a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"/>
+    <path
+        android:fillColor="#212121"
+        android:pathData="M25,36a3,3 0 1,0 6,0a3,3 0 1,0 -6,0"/>
+    <path
+        android:fillColor="#424242"
+        android:pathData="M32,33a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"/>
+</vector>
+

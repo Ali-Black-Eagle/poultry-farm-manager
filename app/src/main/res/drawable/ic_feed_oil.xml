@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFF8E1"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Oil Droplet -->
+    <path
+        android:fillColor="#FFA000"
+        android:pathData="M24,10C24,10 14,24 14,30a10,10 0 0,0 20,0c0,-6 -10,-20 -10,-20z"/>
+    <!-- Inner Golden Glow -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M24,14C24,14 17,25 17,30a7,7 0 0,0 14,0c0,-5 -7,-16 -7,-16z"/>
+    <!-- Reflection highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21,24c-2,3 -2,6 0,8 0.5,-0.5 0.5,-1.5 0,-2 -1,-1.5 -1,-3.5 0,-5 -0.3,-0.3 -0.5,-0.7 0,-1z"/>
+</vector>
+

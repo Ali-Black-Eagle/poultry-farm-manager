@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#F1F8E9"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Pod Shell -->
+    <path
+        android:fillColor="#558B2F"
+        android:pathData="M12,32C10,24 14,14 24,10c8,-3 14,0 16,3 -3,6 -9,12 -16,18 -4,3 -8,4 -12,1z"/>
+    <path
+        android:fillColor="#7CB342"
+        android:pathData="M13,31c2,3 7,2 11,-1 7,-6 13,-12 15,-17 -2,-2 -7,-4 -14,-1 -9,4 -13,13 -12,19z"/>
+    <!-- Soy Beans (Inside pod / round golden seeds) -->
+    <path
+        android:fillColor="#FDD835"
+        android:pathData="M18,27a4,4 0 1,0 8,0a4,4 0 1,0 -8,0"/>
+    <path
+        android:fillColor="#FBC02D"
+        android:pathData="M26,20a4,4 0 1,0 8,0a4,4 0 1,0 -8,0"/>
+    <path
+        android:fillColor="#FFF59D"
+        android:pathData="M33,14a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0"/>
+</vector>
+

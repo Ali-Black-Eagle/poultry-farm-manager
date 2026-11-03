@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#E1F5FE"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Fish Silhouette -->
+    <path
+        android:fillColor="#0288D1"
+        android:pathData="M38,20c-4,3 -10,6 -18,4 -4,-1 -7,-4 -9,-8 0,6 3,11 7,14 7,4 15,2 20,-3l4,3v-14l-4,4z"/>
+    <!-- Fish Eye & Fin -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,18a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0"/>
+    <path
+        android:fillColor="#01579B"
+        android:pathData="M16.5,18a0.8,0.8 0 1,0 1.6,0a0.8,0.8 0 1,0 -1.6,0"/>
+    <path
+        android:fillColor="#29B6F6"
+        android:pathData="M25,23c-2,3 -4,4 -7,4 1,-2 2,-4 7,-4z"/>
+    <!-- Protein Flour / Meal Heap -->
+    <path
+        android:fillColor="#8D6E63"
+        android:pathData="M14,38c3,-5 17,-5 20,0H14z"/>
+    <path
+        android:fillColor="#A1887F"
+        android:pathData="M18,36c2,-3 10,-3 12,0H18z"/>
+</vector>
+

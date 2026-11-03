@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#EDE7F6"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Salt Crystal 1 -->
+    <path
+        android:fillColor="#B39DDB"
+        android:pathData="M18,14l7,4 -7,4 -7,-4z"/>
+    <path
+        android:fillColor="#9575CD"
+        android:pathData="M11,18l7,4v8l-7,-4z"/>
+    <path
+        android:fillColor="#7E57C2"
+        android:pathData="M25,18l-7,4v8l7,-4z"/>
+    <!-- Salt Crystal 2 (Right smaller) -->
+    <path
+        android:fillColor="#D1C4E9"
+        android:pathData="M31,24l5,3 -5,3 -5,-3z"/>
+    <path
+        android:fillColor="#B39DDB"
+        android:pathData="M26,27l5,3v6l-5,-3z"/>
+    <path
+        android:fillColor="#9575CD"
+        android:pathData="M36,27l-5,3v6l5,-3z"/>
+</vector>
+

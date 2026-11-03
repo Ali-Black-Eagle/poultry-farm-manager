@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFF3E0"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Feed Bag / Sack -->
+    <path
+        android:fillColor="#FF9800"
+        android:pathData="M18,14l-2,4 -2,18c0,1.1 0.9,2 2,2h20c1.1,0 2,-0.9 2,-2l-2,-18 -2,-4h-14z"/>
+    <!-- Sack Tie String -->
+    <path
+        android:fillColor="#F57C00"
+        android:pathData="M17,14h14v3H17z"/>
+    <!-- Plus symbol in center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,23h4v10h-4z M19,26h10v4h-10z"/>
+</vector>
+

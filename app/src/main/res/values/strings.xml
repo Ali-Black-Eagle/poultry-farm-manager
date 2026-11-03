@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">مدیریت طیور</string>
+    <string name="widget_farm_status_name">پایش هوشمند مزرعه</string>
+    <string name="widget_farm_status_description">نمایش آمار زنده پرندگان، تخم‌مرغ امروز و دمای سالن‌ها</string>
+    <string name="widget_quick_action_name">دکمه‌های سریع سالن</string>
+    <string name="widget_quick_action_description">دسترسی برق‌آسا به فرم‌های ثبت تخم‌مرغ و شارژ دان</string>
+    <string name="widget_voice_assistant_name">دستیار هوشمند فارم</string>
+    <string name="widget_voice_assistant_description">اجرای سریع فرامین و پاسخ به سوالات مرغداری با هوش مصنوعی از صفحه اصلی گوشی</string>
+</resources>

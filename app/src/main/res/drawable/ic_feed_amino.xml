@@ -1,0 +1,34 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#E8EAF6"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Molecular Bonds -->
+    <path
+        android:strokeColor="#5C6BC0"
+        android:strokeWidth="2.5"
+        android:pathData="M24,16L15,22 M24,16L33,22 M15,22L15,32 M33,22L33,32 M15,32L24,37 M33,32L24,37"/>
+    <!-- Molecular Nodes / Atoms -->
+    <path
+        android:fillColor="#3F51B5"
+        android:pathData="M24,16a4,4 0 1,0 0.01,0z"/>
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M15,22a3.5,3.5 0 1,0 0.01,0z"/>
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M33,22a3.5,3.5 0 1,0 0.01,0z"/>
+    <path
+        android:fillColor="#303F9F"
+        android:pathData="M15,32a3.5,3.5 0 1,0 0.01,0z"/>
+    <path
+        android:fillColor="#303F9F"
+        android:pathData="M33,32a3.5,3.5 0 1,0 0.01,0z"/>
+    <path
+        android:fillColor="#3949AB"
+        android:pathData="M24,37a4,4 0 1,0 0.01,0z"/>
+</vector>
+

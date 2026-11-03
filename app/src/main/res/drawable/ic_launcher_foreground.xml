@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Subtle soft shadow beneath base -->
+    <path
+        android:pathData="M38,82 C44,85 64,85 70,82 C65,86 43,86 38,82 Z"
+        android:fillColor="#33000000" />
+
+    <!-- Golden Egg / Farm Emblem at bottom right base -->
+    <path
+        android:pathData="M60,68 C60,60 76,60 76,68 C76,76 60,76 60,68 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="68"
+                android:startY="60"
+                android:endX="68"
+                android:endY="76"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFE3A8" />
+                <item android:offset="0.6" android:color="#F4A261" />
+                <item android:offset="1.0" android:color="#E76F51" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Tail Feathers (Left arching feathers) -->
+    <path
+        android:pathData="M44,64 C35,62 27,54 28,42 C33,48 40,54 46,58 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="42"
+                android:endX="46"
+                android:endY="64"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#52B788" />
+                <item android:offset="1.0" android:color="#2D6A4F" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M46,60 C38,52 32,40 36,32 C41,39 46,47 50,54 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="32"
+                android:startY="32"
+                android:endX="50"
+                android:endY="60"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#E9C46A" />
+                <item android:offset="1.0" android:color="#DDA15E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M49,56 C44,45 42,32 48,26 C51,33 52,43 53,52 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="42"
+                android:startY="26"
+                android:endX="53"
+                android:endY="56"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#F4A261" />
+                <item android:offset="1.0" android:color="#E76F51" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Rooster Main Body & Breast (Sleek Modern White/Cream) -->
+    <path
+        android:pathData="M44,66 C40,58 48,46 54,40 C58,45 61,46 64,44 C67,49 68,56 65,63 C61,71 54,77 47,78 C42,78 40,73 44,66 Z"
+        android:fillColor="#F8F9FA" />
+
+    <!-- Rooster Chest highlight -->
+    <path
+        android:pathData="M60,46 C64,52 64,62 60,70 C64,65 65,56 63,48 Z"
+        android:fillColor="#E9ECEF" />
+
+    <!-- Wing Arch Accent (Warm Gold / Amber) -->
+    <path
+        android:pathData="M45,64 C49,60 55,58 59,62 C57,67 52,71 47,70 C45,69 44,66 45,64 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="45"
+                android:startY="58"
+                android:endX="59"
+                android:endY="71"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#E9C46A" />
+                <item android:offset="1.0" android:color="#DDA15E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Rooster Neck and Head -->
+    <path
+        android:pathData="M54,42 C54,36 57,32 62,31 C66,31 69,34 68,39 C67,43 63,45 61,47 C57,48 55,45 54,42 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Beak (Golden Yellow) -->
+    <path
+        android:pathData="M68,36 L77,39 L68,42 Z"
+        android:fillColor="#FFB703" />
+
+    <!-- Eye -->
+    <path
+        android:pathData="M63.5,35.5 A1.2,1.2 0 1,0 65.9,35.5 A1.2,1.2 0 1,0 63.5,35.5 Z"
+        android:fillColor="#1B4332" />
+
+    <!-- Comb (Crown on top - Crimson Red) -->
+    <path
+        android:pathData="M57,32 C56,27 59,25 61,28 C63,24 66,24 67,27 C69,25 72,26 71,31 C68,34 62,34 57,32 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="56"
+                android:startY="24"
+                android:endX="72"
+                android:endY="34"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF4D6D" />
+                <item android:offset="1.0" android:color="#C9184A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Wattle (Crimson Red below beak) -->
+    <path
+        android:pathData="M65,42 C67,42 68,46 66,48 C64,49 63,46 64,43 Z"
+        android:fillColor="#C9184A" />
+
+    <!-- Base Plant/Wheat Sprouts (Agricultural theme) -->
+    <path
+        android:pathData="M34,80 C38,76 43,76 45,79 C42,81 37,82 34,80 Z"
+        android:fillColor="#A7C957" />
+    <path
+        android:pathData="M66,80 C70,76 75,76 78,79 C75,81 70,82 66,80 Z"
+        android:fillColor="#A7C957" />
+
+</vector>

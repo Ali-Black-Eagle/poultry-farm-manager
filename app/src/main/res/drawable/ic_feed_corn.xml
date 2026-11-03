@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Outer glow / background circle -->
+    <path
+        android:fillColor="#FFF8E1"
+        android:pathData="M24,4C12.95,4 4,12.95 4,24s8.95,20 20,20 20,-8.95 20,-20S35.05,4 24,4z"/>
+    <!-- Corn Cob Base -->
+    <path
+        android:fillColor="#FBC02D"
+        android:pathData="M20,10c-3,2 -5,8 -3,18 1.5,7.5 7,12 7,12s5.5,-4.5 7,-12c2,-10 0,-16 -3,-18 -2.5,-1.7 -5.5,-1.7 -8,0z"/>
+    <!-- Kernels texture -->
+    <path
+        android:fillColor="#F57F17"
+        android:pathData="M22,14h4v3h-4z M19,19h4v3h-4z M25,19h4v3h-4z M18,24h4v3h-4z M24,24h4v3h-4z M20,29h4v3h-4z M25,29h4v3h-4z M22,34h4v3h-4z"/>
+    <!-- Green Leaves / Husks -->
+    <path
+        android:fillColor="#689F38"
+        android:pathData="M16,28c-4,6 -1,13 4,14 -3,-3 -5,-8 -4,-14z"/>
+    <path
+        android:fillColor="#7CB342"
+        android:pathData="M32,28c4,6 1,13 -4,14 3,-3 5,-8 4,-14z"/>
+</vector>
+
