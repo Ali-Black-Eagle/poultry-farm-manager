@@ -1724,7 +1724,7 @@ fun FarmWeatherForecastCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .clickable { isExpanded = !isExpanded }
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 // Top Row: Avatar + Title & Condition on Right, Temperature + Refresh + Chevron on Left
                 Row(
@@ -1824,106 +1824,6 @@ fun FarmWeatherForecastCard(
                     )
                 }
 
-                // Sub-Row (Quick Metrics): Humidity, Wind, Forecast Hint
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val chipBg = if (isCardDark) Color.Black.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.88f)
-                    val chipBorder = BorderStroke(0.6.dp, if (isCardDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.08f))
-                    val chipTextColor = if (isCardDark) Color(0xFFF1F5F9) else Color(0xFF0F172A)
-
-                    // Humidity Chip
-                    if (weatherResult?.humidityPercent != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = chipBg,
-                            border = chipBorder
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.WaterDrop,
-                                    contentDescription = null,
-                                    tint = if (isCardDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "رطوبت: ${toPersianDigits(weatherResult.humidityPercent)}٪",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = chipTextColor
-                                )
-                            }
-                        }
-                    }
-
-                    // Wind Chip
-                    if (weatherResult?.windSpeedKmH != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = chipBg,
-                            border = chipBorder
-                        ) {
-                            Text(
-                                text = "💨 باد: ${toPersianDigits(weatherResult.windSpeedKmH.toInt())} km/h",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = chipTextColor,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-
-                    // Daylight Duration Chip
-                    if (weatherResult?.daylightDurationFa != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = chipBg,
-                            border = chipBorder
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("☀️", fontSize = 10.sp)
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "طول روز: ${weatherResult.daylightDurationFa}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = chipTextColor
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Expand / Collapse Hint (High contrast, styled pill button)
-                    Surface(
-                        shape = RoundedCornerShape(7.dp),
-                        color = weatherPalette.badgeBackground,
-                        border = BorderStroke(0.6.dp, weatherPalette.iconTint.copy(alpha = 0.35f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (isExpanded) "بستن جزئیات ▲" else "پیش‌بینی ۴ روزه ▼",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = weatherPalette.badgeTextColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
             }
 
             // Expanded Full Details (Smooth Spring & Fade Animation)
@@ -1945,9 +1845,102 @@ fun FarmWeatherForecastCard(
                         .padding(start = 14.dp, end = 14.dp, bottom = 14.dp, top = 2.dp)
                 ) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(bottom = 12.dp),
+                        modifier = Modifier.padding(bottom = 10.dp),
                         color = weatherPalette.titleColor.copy(alpha = 0.2f)
                     )
+
+                    // Quick Metrics Strip (Only Visible in Maximized Mode): Humidity, Wind, Daylight
+                    val chipBg = if (isCardDark) Color.Black.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.88f)
+                    val chipBorder = BorderStroke(0.6.dp, if (isCardDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.08f))
+                    val chipTextColor = if (isCardDark) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Humidity Chip
+                        if (weatherResult?.humidityPercent != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = chipBg,
+                                border = chipBorder,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WaterDrop,
+                                        contentDescription = null,
+                                        tint = if (isCardDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "رطوبت: ${toPersianDigits(weatherResult.humidityPercent)}٪",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = chipTextColor
+                                    )
+                                }
+                            }
+                        }
+
+                        // Wind Chip
+                        if (weatherResult?.windSpeedKmH != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = chipBg,
+                                border = chipBorder,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text("💨", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "باد: ${toPersianDigits(weatherResult.windSpeedKmH.toInt())} km/h",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = chipTextColor
+                                    )
+                                }
+                            }
+                        }
+
+                        // Daylight Duration Chip
+                        if (weatherResult?.daylightDurationFa != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = chipBg,
+                                border = chipBorder,
+                                modifier = Modifier.weight(1.3f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text("☀️", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "طول روز: ${weatherResult.daylightDurationFa}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = chipTextColor
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // Photoperiod & Natural Daylight Section (طول روشنایی روز و برنامه نوری)
                     if (weatherResult?.daylightDurationFa != null) {
