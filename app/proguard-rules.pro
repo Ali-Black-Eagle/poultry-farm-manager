@@ -9,6 +9,7 @@
 -keep class com.example.poultryapp.engine.** { *; }
 -keep class com.example.poultryapp.security.** { *; }
 -keep class com.example.poultryapp.voice.** { *; }
+-keep class com.example.poultryapp.assistant.** { *; }
 
 # Keep Android entry points, receivers, services, and widgets
 -keep class com.example.poultryapp.MainActivity { *; }

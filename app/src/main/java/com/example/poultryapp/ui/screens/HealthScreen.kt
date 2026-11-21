@@ -161,9 +161,9 @@ fun HealthScreen(
             if (symptomSearchQuery.isBlank()) {
                 DiseaseCatalog.getSymptomsForCategory(selectedCategory)
             } else {
-                val normQuery = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(symptomSearchQuery)
+                val normQuery = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(symptomSearchQuery).normalized
                 DiseaseCatalog.allSymptoms.filter { sym ->
-                    val normTitle = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(sym.titleFa)
+                    val normTitle = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(sym.titleFa).normalized
                     normTitle.contains(normQuery) || sym.voiceAliases.any { it.contains(normQuery) }
                 }
             }

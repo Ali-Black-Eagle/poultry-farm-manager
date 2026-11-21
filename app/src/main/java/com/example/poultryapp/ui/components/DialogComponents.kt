@@ -3201,7 +3201,9 @@ fun LogMortalityDialog(
     var notes by remember { mutableStateOf("") }
 
     val selectedFlock = flocks.find { it.id == selectedFlockId }
-    val count = countText.toIntOrNull() ?: 0
+    val count = parsePersianOrEnglishInt(countText) ?: 0
+    val maxLiveBirds = selectedFlock?.effectiveBirdCount ?: 0
+    val exceedsLive = selectedFlock != null && count > maxLiveBirds
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -3236,13 +3238,13 @@ fun LogMortalityDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "ثبت تلفات و خروج پرنده",
+                                text = "ثبت تلفات پرندگان",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "تفکیک تلفات زیستی از خروج و فروش تجاری",
+                                text = "کسر از موجودی زنده و محاسبه در نرخ تلفات گله",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -3288,7 +3290,7 @@ fun LogMortalityDialog(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                                 Text(
-                                    text = "موجودی: ${com.example.poultryapp.engine.toPersianDigits(f.effectiveBirdCount)} قطعه",
+                                    text = "موجودی: ${toPersianDigits(f.effectiveBirdCount)} قطعه",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -3303,8 +3305,17 @@ fun LogMortalityDialog(
                 OutlinedTextField(
                     value = countText,
                     onValueChange = { countText = it.filter { c -> c.isDigit() } },
-                    label = { Text("تعداد پرنده (قطعه)") },
+                    label = { Text("تعداد تلفات (قطعه)") },
                     placeholder = { Text("مثلاً: ۳") },
+                    isError = exceedsLive,
+                    supportingText = if (exceedsLive) {
+                        {
+                            Text(
+                                "تعداد از موجودی زنده گله (${toPersianDigits(maxLiveBirds)} قطعه) بیشتر است",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else null,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -3315,24 +3326,24 @@ fun LogMortalityDialog(
 
                 // Reason selection
                 Text(
-                    text = "علت یا منشأ خروج:",
+                    text = "علت تلفات:",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    MortalityReason.values().forEach { reason ->
+                    MortalityReason.entries.forEach { reason ->
                         val isSelected = reason == selectedReason
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = if (isSelected) {
-                                if (reason == MortalityReason.LIVE_SALE) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
                             } else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
                             border = BorderStroke(
                                 1.dp,
                                 if (isSelected) {
-                                    if (reason == MortalityReason.LIVE_SALE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    MaterialTheme.colorScheme.error
                                 } else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                             ),
                             modifier = Modifier
@@ -3350,9 +3361,9 @@ fun LogMortalityDialog(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                                 Text(
-                                    text = if (reason.isTrueMortality) "تلفات" else "خروج تجاری",
+                                    text = "تلفات زیستی",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (reason.isTrueMortality) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
@@ -3361,22 +3372,14 @@ fun LogMortalityDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Informational Banner based on selected reason
+                // Informational Banner
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = if (selectedReason == MortalityReason.LIVE_SALE) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                    } else {
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                    },
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (selectedReason == MortalityReason.LIVE_SALE) {
-                            "✨ فروش پرنده زنده: از آمار موجودی پرندگان گله کسر می‌شود اما به عنوان تلفات زیستی محاسبه نمی‌شود."
-                        } else {
-                            "⚠️ تلفات بیولوژیکی: از جمعیت زنده کسر گردیده و مستقیماً در درصد تلفات دوره محاسبه می‌شود."
-                        },
+                        text = "⚠️ تلفات بیولوژیکی: از جمعیت زنده کسر گردیده و مستقیماً در نرخ تلفات گله محاسبه می‌شود.",
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(10.dp)
                     )
@@ -3435,16 +3438,699 @@ fun LogMortalityDialog(
                     }
                     Button(
                         onClick = {
-                            if (selectedFlock != null && count > 0) {
+                            if (selectedFlock != null && count > 0 && !exceedsLive) {
                                 onSave(selectedFlockId, count, selectedReason, diagnosisHint.ifBlank { null }, dateText, notes.ifBlank { null })
                                 onDismiss()
                             }
                         },
-                        enabled = selectedFlock != null && count > 0,
+                        enabled = selectedFlock != null && count > 0 && !exceedsLive && dateText.isNotBlank(),
                         modifier = Modifier.weight(1.5f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("ثبت تلفات", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== SELL BIRDS DIALOG (فروش پرنده - درآمدزا) ====================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SellBirdsDialog(
+    flocks: List<Flock>,
+    initialFlockId: Long? = null,
+    isWorkerMode: Boolean = false,
+    onDismiss: () -> Unit,
+    onSave: (
+        flockId: Long,
+        birdCount: Int,
+        liveWeightKg: Double?,
+        unitPriceTomans: Double?,
+        totalRevenueTomans: Double,
+        buyerName: String?,
+        dateJalaliStr: String,
+        notes: String?,
+        createFinanceTransaction: Boolean
+    ) -> Unit
+) {
+    var selectedFlockId by remember {
+        mutableStateOf(initialFlockId ?: flocks.firstOrNull()?.id ?: 0L)
+    }
+    var countText by remember { mutableStateOf("") }
+    var liveWeightText by remember { mutableStateOf("") }
+    var unitPriceText by remember { mutableStateOf("") }
+    var totalRevenueText by remember { mutableStateOf("") }
+    var hasManualTotalRevenue by remember { mutableStateOf(false) }
+    var createFinanceTx by remember { mutableStateOf(!isWorkerMode) }
+    var buyerName by remember { mutableStateOf("") }
+    var dateText by remember {
+        mutableStateOf(com.example.poultryapp.engine.JalaliDateHelper.getJalaliDate().toStandardString())
+    }
+    var notes by remember { mutableStateOf("") }
+
+    val selectedFlock = flocks.find { it.id == selectedFlockId }
+    val count = parsePersianOrEnglishInt(countText) ?: 0
+    val maxLiveBirds = selectedFlock?.effectiveBirdCount ?: 0
+    val exceedsLive = selectedFlock != null && count > maxLiveBirds
+    val liveWeight = parsePersianOrEnglishDouble(liveWeightText)?.takeIf { it > 0.0 }
+    val unitPrice = parsePersianOrEnglishDouble(unitPriceText)?.takeIf { it > 0.0 }
+
+    LaunchedEffect(count, liveWeight, unitPrice, hasManualTotalRevenue) {
+        if (!hasManualTotalRevenue && unitPrice != null && count > 0) {
+            val multiplier = if (liveWeight != null && liveWeight > 0.0) liveWeight else count.toDouble()
+            totalRevenueText = (unitPrice * multiplier).toLong().toString()
+        }
+    }
+
+    val totalRevenue = parsePersianOrEnglishDouble(totalRevenueText)?.coerceAtLeast(0.0) ?: 0.0
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = com.example.poultryapp.theme.HealthGreenContainer,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("💰", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "ثبت فروش پرنده",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "فروش تجاری جدا از تلفات با ثبت درآمد در امور مالی",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "بستن")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "گله هدف:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    flocks.forEach { f ->
+                        val isSelected = f.id == selectedFlockId
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedFlockId = f.id }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = f.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    if (f.isWithdrawalActive) {
+                                        Text(
+                                            text = "⚠️ دوره پرهیز: ${f.activeMedicationName ?: "دارو"} (${toPersianDigits(f.withdrawalRemainingHours)} ساعت)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "موجودی: ${toPersianDigits(f.effectiveBirdCount)} قطعه",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (selectedFlock?.isWithdrawalActive == true) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "⛔ هشدار دوره پرهیز دارویی فعال",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "گله «${selectedFlock.name}» به دلیل مصرف «${selectedFlock.activeMedicationName ?: "دارو"}» تا ${toPersianDigits(selectedFlock.withdrawalRemainingHours)} ساعت آینده در دوره پرهیز قرار دارد. عرضه جهت مصرف انسانی در این بازه توصیه نمی‌شود.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = countText,
+                    onValueChange = { countText = it.filter { c -> c.isDigit() } },
+                    label = { Text("تعداد پرنده فروخته‌شده (قطعه) *") },
+                    placeholder = { Text("مثلاً: ۵۰") },
+                    isError = exceedsLive,
+                    supportingText = if (exceedsLive) {
+                        {
+                            Text(
+                                "تعداد فروش از موجودی زنده گله (${toPersianDigits(maxLiveBirds)} قطعه) بیشتر است",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = dateText,
+                        onValueChange = { dateText = it },
+                        label = { Text("تاریخ فروش (شمسی) *") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = liveWeightText,
+                        onValueChange = { liveWeightText = it },
+                        label = { Text("وزن زنده کل (کیلو)") },
+                        placeholder = { Text("اختیاری") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+
+                if (!isWorkerMode) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = com.example.poultryapp.theme.HealthGreenContainer.copy(alpha = 0.28f),
+                        border = BorderStroke(1.dp, com.example.poultryapp.theme.HealthGreen.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "اطلاعات مالی فروش (درآمدزا)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = com.example.poultryapp.theme.HealthGreen
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = unitPriceText,
+                                onValueChange = {
+                                    unitPriceText = it.filter { c -> c.isDigit() || c == '.' || c == '٫' }
+                                    hasManualTotalRevenue = false
+                                },
+                                label = { Text(if (liveWeight != null) "قیمت هر کیلو (تومان - اختیاری)" else "قیمت هر قطعه (تومان - اختیاری)") },
+                                placeholder = { Text("محاسبه خودکار مبلغ کل") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = totalRevenueText,
+                                onValueChange = {
+                                    totalRevenueText = it.filter { c -> c.isDigit() || c == '.' || c == '٫' }
+                                    hasManualTotalRevenue = true
+                                },
+                                label = { Text("مبلغ کل فروش (تومان - اختیاری)") },
+                                placeholder = { Text("مثلاً: ۱۵۰۰۰۰۰۰") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { createFinanceTx = !createFinanceTx }
+                            ) {
+                                Checkbox(
+                                    checked = createFinanceTx,
+                                    onCheckedChange = { createFinanceTx = it }
+                                )
+                                Text(
+                                    text = "ثبت خودکار درآمد در بخش امور مالی",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = buyerName,
+                    onValueChange = { buyerName = it },
+                    label = { Text("نام خریدار (اختیاری)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("یادداشت (اختیاری)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 2
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("انصراف")
+                    }
+                    Button(
+                        onClick = {
+                            if (selectedFlock != null && count > 0 && !exceedsLive && dateText.isNotBlank()) {
+                                onSave(
+                                    selectedFlockId,
+                                    count,
+                                    liveWeight,
+                                    if (isWorkerMode) null else unitPrice,
+                                    if (isWorkerMode) 0.0 else totalRevenue,
+                                    buyerName.ifBlank { null },
+                                    dateText.trim(),
+                                    notes.ifBlank { null },
+                                    !isWorkerMode && createFinanceTx && totalRevenue > 0.0
+                                )
+                                onDismiss()
+                            }
+                        },
+                        enabled = selectedFlock != null && count > 0 && !exceedsLive && dateText.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = com.example.poultryapp.theme.HealthGreen),
+                        modifier = Modifier.weight(1.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("ثبت فروش", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== SLAUGHTER BIRDS DIALOG (کشتار پرنده - فنی و غیرمالی) ====================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SlaughterBirdsDialog(
+    flocks: List<Flock>,
+    initialFlockId: Long? = null,
+    onDismiss: () -> Unit,
+    onSave: (
+        flockId: Long,
+        birdCount: Int,
+        birdAgeDays: Int,
+        liveWeightKg: Double?,
+        carcassWeightKg: Double?,
+        dateJalaliStr: String,
+        notes: String?
+    ) -> Unit
+) {
+    var selectedFlockId by remember {
+        mutableStateOf(initialFlockId ?: flocks.firstOrNull()?.id ?: 0L)
+    }
+    val initialFlock = flocks.find { it.id == selectedFlockId }
+    var countText by remember { mutableStateOf("") }
+    var ageDaysText by remember { mutableStateOf((initialFlock?.ageDays ?: 1).toString()) }
+    var lastAutoSyncedFlockId by remember { mutableStateOf(selectedFlockId) }
+    var dateText by remember {
+        mutableStateOf(com.example.poultryapp.engine.JalaliDateHelper.getJalaliDate().toStandardString())
+    }
+    var liveWeightText by remember { mutableStateOf("") }
+    var carcassWeightText by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+
+    val selectedFlock = flocks.find { it.id == selectedFlockId }
+    LaunchedEffect(selectedFlockId) {
+        if (selectedFlock != null && lastAutoSyncedFlockId != selectedFlockId) {
+            ageDaysText = selectedFlock.ageDays.toString()
+            lastAutoSyncedFlockId = selectedFlockId
+        }
+    }
+
+    val count = parsePersianOrEnglishInt(countText) ?: 0
+    val ageDays = parsePersianOrEnglishInt(ageDaysText) ?: 0
+    val maxLiveBirds = selectedFlock?.effectiveBirdCount ?: 0
+    val exceedsLive = selectedFlock != null && count > maxLiveBirds
+    val liveWeight = parsePersianOrEnglishDouble(liveWeightText)?.takeIf { it > 0.0 }
+    val carcassWeight = parsePersianOrEnglishDouble(carcassWeightText)?.takeIf { it > 0.0 }
+    val carcassYieldPercent = com.example.poultryapp.data.local.FlockExitAnalytics.calculateCarcassYieldPercent(liveWeight, carcassWeight)
+    val carcassExceedsLiveWeight = liveWeight != null && carcassWeight != null && carcassWeight > liveWeight
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🔪", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "ثبت کشتار پرنده",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "ثبت فنی سن، تاریخ و وزن کشتار (جدا از فروش و تلفات)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "بستن")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "گله هدف:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    flocks.forEach { f ->
+                        val isSelected = f.id == selectedFlockId
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedFlockId = f.id }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = f.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = "سن فعلی: ${toPersianDigits(f.ageDays)} روز | موجودی: ${toPersianDigits(f.effectiveBirdCount)} قطعه",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (f.isWithdrawalActive) {
+                                    Text(
+                                        text = "⚠️ پرهیز",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedFlock?.isWithdrawalActive == true) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "⛔ هشدار دوره پرهیز دارویی فعال",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "گله «${selectedFlock.name}» در دوره پرهیز داروی «${selectedFlock.activeMedicationName ?: "نامشخص"}» (${toPersianDigits(selectedFlock.withdrawalRemainingHours)} ساعت باقی‌مانده) است. کشتار پیش از اتمام دوره پرهیز توصیه نمی‌شود.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = countText,
+                    onValueChange = { countText = it.filter { c -> c.isDigit() } },
+                    label = { Text("تعداد پرنده کشتارشده (قطعه) *") },
+                    placeholder = { Text("مثلاً: ۱۰۰") },
+                    isError = exceedsLive,
+                    supportingText = if (exceedsLive) {
+                        {
+                            Text(
+                                "تعداد کشتار از موجودی زنده گله (${toPersianDigits(maxLiveBirds)} قطعه) بیشتر است",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = ageDaysText,
+                        onValueChange = { ageDaysText = it.filter { c -> c.isDigit() } },
+                        label = { Text("سن پرنده (روز) *") },
+                        supportingText = if (ageDays > 0) {
+                            { Text("حدود ${toPersianDigits(((ageDays - 1) / 7 + 1).coerceAtLeast(1))} هفته") }
+                        } else null,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = dateText,
+                        onValueChange = { dateText = it },
+                        label = { Text("تاریخ کشتار (شمسی) *") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = liveWeightText,
+                        onValueChange = { liveWeightText = it },
+                        label = { Text("وزن زنده (کیلو)") },
+                        placeholder = { Text("اختیاری") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = carcassWeightText,
+                        onValueChange = { carcassWeightText = it },
+                        label = { Text("وزن لاشه (کیلو)") },
+                        placeholder = { Text("اختیاری") },
+                        isError = carcassExceedsLiveWeight,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+
+                if (carcassExceedsLiveWeight) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "توجه: وزن لاشه نباید از وزن زنده بیشتر باشد.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (carcassYieldPercent != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "📊 راندمان فنی لاشه: ${toPersianDigits(String.format(java.util.Locale.US, "%.1f", carcassYieldPercent))}٪",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("نام کشتارگاه / یادداشت فنی (اختیاری)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 2
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("انصراف")
+                    }
+                    Button(
+                        onClick = {
+                            if (selectedFlock != null && count > 0 && ageDays > 0 && !exceedsLive && dateText.isNotBlank()) {
+                                onSave(
+                                    selectedFlockId,
+                                    count,
+                                    ageDays,
+                                    liveWeight,
+                                    carcassWeight,
+                                    dateText.trim(),
+                                    notes.ifBlank { null }
+                                )
+                                onDismiss()
+                            }
+                        },
+                        enabled = selectedFlock != null && count > 0 && ageDays > 0 && !exceedsLive && dateText.isNotBlank(),
+                        modifier = Modifier.weight(1.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("ثبت کشتار", fontWeight = FontWeight.Bold)
                     }
                 }
             }

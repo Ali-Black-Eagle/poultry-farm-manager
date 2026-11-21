@@ -370,7 +370,7 @@ private fun InvestmentFeasibilityTab() {
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         FeasibilityStat("کل دان مورد نیاز:", "${toPersianDigits(result.totalFeedKg.toInt())} کیلوگرم")
-                        FeasibilityStat("نقطه سر‌به‌سر دوره:", "روز ${toPersianDigits(result.breakEvenDay)}")
+                        FeasibilityStat("نقطه سر‌به‌سر دوره:", if (result.breakEvenDay != null) "روز ${toPersianDigits(result.breakEvenDay)}" else "حاصل نمی‌شود (زیان‌ده)")
                     }
                 }
             }

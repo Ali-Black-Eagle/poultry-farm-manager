@@ -12,6 +12,11 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.poultryapp.MainActivity
 import com.example.poultryapp.R
+import com.example.poultryapp.data.local.AppDatabaseHelper
+import com.example.poultryapp.engine.ChargeItemType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -34,11 +39,55 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             AlarmScheduler.ACTION_ALARM_TRIGGER -> {
-                showAlarmNotification(context, notificationManager, alarmId, title, message)
+                val db = AppDatabaseHelper.getInstance(context)
+                if (alarmId == 9999) {
+                    val morningEnabled = db.getSetting("alert_morning", "true").toBoolean()
+                    if (morningEnabled) {
+                        showAlarmNotification(context, notificationManager, alarmId, title, message)
+                        val h = db.getSetting("morning_hour", "7").toIntOrNull() ?: 7
+                        val m = db.getSetting("morning_minute", "0").toIntOrNull() ?: 0
+                        AlarmScheduler.scheduleMorningReminder(context, h, m)
+                    }
+                } else {
+                    val calendarAlertsEnabled = db.getSetting("alert_calendar", "true").toBoolean()
+                    if (calendarAlertsEnabled) {
+                        showAlarmNotification(context, notificationManager, alarmId, title, message)
+                    }
+                    if (alarmId >= 10) {
+                        val schedId = (alarmId / 10).toLong()
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val repo = com.example.poultryapp.data.repository.ScheduleRepository(context)
+                                val sched = repo.getAllSchedules().find { it.id == schedId }
+                                if (sched != null && sched.isEnabled && calendarAlertsEnabled) {
+                                    AlarmScheduler.scheduleWeeklyAlarm(context, sched)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
             }
 
             AlarmScheduler.ACTION_CHARGE_WARNING -> {
-                showAlarmNotification(context, notificationManager, alarmId, title, message)
+                val db = AppDatabaseHelper.getInstance(context)
+                val feedWaterAlertsEnabled = db.getSetting("alert_feed_water", "true").toBoolean()
+                val flockId = intent.getLongExtra(AlarmScheduler.EXTRA_FLOCK_ID, -1L)
+                val itemTypeName = intent.getStringExtra(AlarmScheduler.EXTRA_ITEM_TYPE)
+                val itemType = when (itemTypeName) {
+                    ChargeItemType.FEED.name -> ChargeItemType.FEED
+                    ChargeItemType.WATER.name -> ChargeItemType.WATER
+                    else -> if (alarmId % 10 == 1) ChargeItemType.FEED else ChargeItemType.WATER
+                }
+                val flock = if (flockId != -1L) db.getAllFlocks().find { it.id == flockId } else null
+                val isTrackingEnabled = flock != null && if (itemType == ChargeItemType.FEED) flock.isFeedEnabled else flock.isWaterEnabled
+
+                if (feedWaterAlertsEnabled && isTrackingEnabled) {
+                    showAlarmNotification(context, notificationManager, alarmId, title, message)
+                } else {
+                    notificationManager.cancel(alarmId)
+                }
                 LiveFeedWaterNotificationManager.updateAllLowNotifications(context)
             }
 

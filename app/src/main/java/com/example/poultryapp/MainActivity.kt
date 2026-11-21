@@ -14,6 +14,10 @@ import com.example.poultryapp.ui.main.MainScreen
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        var lastBackgroundTimeMillis: Long = 0L
+    }
+
     private val targetTabState = mutableStateOf<String?>(null)
     private val targetFlockIdState = mutableStateOf<Long?>(null)
 
@@ -21,6 +25,11 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { _ ->
         // Permission outcome handled by system
+    }
+
+    override fun onStop() {
+        super.onStop()
+        lastBackgroundTimeMillis = System.currentTimeMillis()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

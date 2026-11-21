@@ -184,6 +184,7 @@ class SettingsRepository(private val context: Context) {
             isOnlineWeatherEnabled = dbHelper.getSetting("is_online_weather_enabled", "true").toBoolean(),
             isWorkerModeEnabled = dbHelper.getSetting("is_worker_mode", "false").toBoolean(),
             managerPinHash = dbHelper.getSetting("manager_pin_hash", ""),
+            managerPinSalt = dbHelper.getSetting("manager_pin_salt", ""),
             managerRecoveryKey = dbHelper.getSetting("manager_recovery_key", ""),
             isBiometricEnabled = dbHelper.getSetting("is_biometric_enabled", "true").toBoolean(),
             isAutoAddEggsToWarehouseEnabled = dbHelper.getSetting("is_auto_add_eggs_warehouse", "true").toBoolean()
@@ -212,6 +213,7 @@ class SettingsRepository(private val context: Context) {
         dbHelper.saveSetting("is_online_weather_enabled", settings.isOnlineWeatherEnabled.toString())
         dbHelper.saveSetting("is_worker_mode", settings.isWorkerModeEnabled.toString())
         dbHelper.saveSetting("manager_pin_hash", settings.managerPinHash)
+        dbHelper.saveSetting("manager_pin_salt", settings.managerPinSalt)
         dbHelper.saveSetting("manager_recovery_key", settings.managerRecoveryKey)
         dbHelper.saveSetting("is_biometric_enabled", settings.isBiometricEnabled.toString())
         dbHelper.saveSetting("is_auto_add_eggs_warehouse", settings.isAutoAddEggsToWarehouseEnabled.toString())
@@ -477,5 +479,56 @@ class BiosecurityRepository(context: Context) {
 
     suspend fun toggleBiosecurityCheck(id: String, isCompleted: Boolean, dateJalaliStr: String? = null): Boolean = withContext(Dispatchers.IO) {
         dbHelper.toggleBiosecurityCheck(id, isCompleted, dateJalaliStr)
+    }
+}
+
+class BirdExitRepository(context: Context) {
+    private val dbHelper = AppDatabaseHelper.getInstance(context)
+
+    fun getAllBirdSalesFlow(): Flow<List<com.example.poultryapp.data.local.BirdSaleLog>> {
+        return dbHelper.dbUpdateSignal.map {
+            dbHelper.getAllBirdSaleLogs()
+        }.flowOn(Dispatchers.IO)
+    }
+
+    suspend fun getAllBirdSales(): List<com.example.poultryapp.data.local.BirdSaleLog> = withContext(Dispatchers.IO) {
+        dbHelper.getAllBirdSaleLogs()
+    }
+
+    suspend fun getBirdSaleById(id: Long): com.example.poultryapp.data.local.BirdSaleLog? = withContext(Dispatchers.IO) {
+        dbHelper.getBirdSaleLogById(id)
+    }
+
+    suspend fun insertBirdSaleLog(
+        log: com.example.poultryapp.data.local.BirdSaleLog,
+        createFinanceTransaction: Boolean = true
+    ): Long = withContext(Dispatchers.IO) {
+        dbHelper.insertBirdSaleLog(log, createFinanceTransaction)
+    }
+
+    suspend fun deleteBirdSaleLog(id: Long): Boolean = withContext(Dispatchers.IO) {
+        dbHelper.deleteBirdSaleLog(id)
+    }
+
+    fun getAllBirdSlaughtersFlow(): Flow<List<com.example.poultryapp.data.local.BirdSlaughterLog>> {
+        return dbHelper.dbUpdateSignal.map {
+            dbHelper.getAllBirdSlaughterLogs()
+        }.flowOn(Dispatchers.IO)
+    }
+
+    suspend fun getAllBirdSlaughters(): List<com.example.poultryapp.data.local.BirdSlaughterLog> = withContext(Dispatchers.IO) {
+        dbHelper.getAllBirdSlaughterLogs()
+    }
+
+    suspend fun getBirdSlaughterById(id: Long): com.example.poultryapp.data.local.BirdSlaughterLog? = withContext(Dispatchers.IO) {
+        dbHelper.getBirdSlaughterLogById(id)
+    }
+
+    suspend fun insertBirdSlaughterLog(log: com.example.poultryapp.data.local.BirdSlaughterLog): Long = withContext(Dispatchers.IO) {
+        dbHelper.insertBirdSlaughterLog(log)
+    }
+
+    suspend fun deleteBirdSlaughterLog(id: Long): Boolean = withContext(Dispatchers.IO) {
+        dbHelper.deleteBirdSlaughterLog(id)
     }
 }

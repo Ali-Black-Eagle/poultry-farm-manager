@@ -209,8 +209,9 @@ fun WarehouseScreen(
                             item.currentStock / dailyConsumptionKg
                         } else Double.MAX_VALUE
 
-                        val isCritical = (isFeed && daysRemaining <= 3.0) || (!isFeed && item.minAlertThreshold > 0.0 && item.currentStock <= item.minAlertThreshold)
-                        val isWarning = isFeed && daysRemaining in 3.0..7.0
+                        val alertsEnabledForItem = item.minAlertThreshold > 0.0
+                        val isCritical = alertsEnabledForItem && ((isFeed && daysRemaining <= 3.0) || item.currentStock <= item.minAlertThreshold)
+                        val isWarning = alertsEnabledForItem && isFeed && daysRemaining in 3.0..7.0
 
                         Surface(
                             shape = RoundedCornerShape(FarmDimens.CardRadius),

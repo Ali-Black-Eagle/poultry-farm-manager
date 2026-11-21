@@ -154,8 +154,9 @@ object DailyNutritionEngine {
             finalPerBirdWater = (baseFeedGrams * waterToFeedRatio * waterMultiplier).coerceAtLeast(2.0)
         }
 
-        val totalFeedGrams = finalPerBirdFeed * birdCount.coerceAtLeast(1)
-        val totalWaterMl = finalPerBirdWater * birdCount.coerceAtLeast(1)
+        val effectiveCount = if (birdCount <= 0) 0 else birdCount
+        val totalFeedGrams = if (effectiveCount == 0) 0.0 else finalPerBirdFeed * effectiveCount
+        val totalWaterMl = if (effectiveCount == 0) 0.0 else finalPerBirdWater * effectiveCount
 
         return FlockDailyRequirement(
             perBirdFeedGrams = finalPerBirdFeed,

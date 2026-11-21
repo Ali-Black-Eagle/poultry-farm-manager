@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,10 +65,12 @@ enum class FlocksSubTab(val titleFa: String, val icon: ImageVector) {
     OVERVIEW("گله‌ها", Icons.Default.Groups),
     EGG_PRODUCTION("تخم‌گذاری", Icons.Default.Circle),
     MORTALITY("آمار تلفات", Icons.Default.TrendingDown),
+    SALES_SLAUGHTER("فروش و کشتار", Icons.Default.ShoppingCart),
     FEED_WATER("دان و آب", Icons.Default.WaterDrop),
     CALENDAR("تقویم فارم", Icons.Default.CalendarMonth)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FlocksScreen(
     flocks: List<Flock>,
@@ -77,6 +81,8 @@ fun FlocksScreen(
     onSubTabSelected: (FlocksSubTab) -> Unit = {},
     userRole: UserRole = UserRole.MANAGER,
     mortalityLogs: List<FlockMortalityLog> = emptyList(),
+    birdSales: List<com.example.poultryapp.data.local.BirdSaleLog> = emptyList(),
+    birdSlaughters: List<com.example.poultryapp.data.local.BirdSlaughterLog> = emptyList(),
     eggProductions: List<EggProduction> = emptyList(),
     birdTransfers: List<BirdTransfer> = emptyList(),
     onTransferBirds: (fromFlockId: Long, toFlockId: Long, count: Int, notes: String?) -> Unit = { _, _, _, _ -> },
@@ -84,6 +90,10 @@ fun FlocksScreen(
     onLogDetailedEggProduction: ((flockIds: List<Long>, fertile: Int, tableEgg: Int, broken: Int, dirty: Int, doubleYolk: Int, trayCount: Double, trayGrossWeightGrams: Double?, netEggAverageWeightGrams: Double?, dateJalaliStr: String, notes: String?) -> Unit)? = null,
     onLogMortality: ((flockId: Long, count: Int, reason: MortalityReason, diagnosisHint: String?, dateJalaliStr: String, notes: String?) -> Unit)? = null,
     onDeleteMortality: ((Long) -> Unit)? = null,
+    onSellBirds: ((flockId: Long, birdCount: Int, liveWeightKg: Double?, unitPriceTomans: Double?, totalRevenueTomans: Double, buyerName: String?, dateJalaliStr: String, notes: String?, createFinanceTransaction: Boolean) -> Unit)? = null,
+    onDeleteBirdSale: ((Long) -> Unit)? = null,
+    onSlaughterBirds: ((flockId: Long, birdCount: Int, birdAgeDays: Int, liveWeightKg: Double?, carcassWeightKg: Double?, dateJalaliStr: String, notes: String?) -> Unit)? = null,
+    onDeleteBirdSlaughter: ((Long) -> Unit)? = null,
     onDeleteEggProduction: (Long) -> Unit = {},
     onAddFlock: (
         name: String,
@@ -150,18 +160,29 @@ fun FlocksScreen(
     var showRecordEggDialog by remember { mutableStateOf(false) }
     var showLogMortalityDialog by remember { mutableStateOf(false) }
     var mortalityTargetFlockId by remember { mutableStateOf<Long?>(null) }
+    var showSellBirdsDialog by remember { mutableStateOf(false) }
+    var sellTargetFlockId by remember { mutableStateOf<Long?>(null) }
+    var showSlaughterBirdsDialog by remember { mutableStateOf(false) }
+    var slaughterTargetFlockId by remember { mutableStateOf<Long?>(null) }
     var transferringSourceFlock by remember { mutableStateOf<Flock?>(null) }
     var editingFlock by remember { mutableStateOf<Flock?>(null) }
     var deletingFlockId by remember { mutableStateOf<Long?>(null) }
     var deletingEggProductionId by remember { mutableStateOf<Long?>(null) }
     var deletingMortalityId by remember { mutableStateOf<Long?>(null) }
+    var deletingBirdSaleId by remember { mutableStateOf<Long?>(null) }
+    var deletingBirdSlaughterId by remember { mutableStateOf<Long?>(null) }
     var selectedMortalityFlockFilterId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var exitViewMode by rememberSaveable { mutableStateOf("ALL") } // "ALL", "SALES", "SLAUGHTERS"
+    var selectedExitFlockFilterId by rememberSaveable { mutableStateOf<Long?>(null) }
     var tempDialogFlock by remember { mutableStateOf<Flock?>(null) }
     var viewingThermalGuideForFlock by remember { mutableStateOf<Pair<Flock, com.example.poultryapp.engine.ThermalStressGuide>?>(null) }
     var expandedFlockIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
     val currentSeason: FarmSeason = remember { DailyNutritionEngine.getCurrentSeason() }
 
     val totalBirds = remember(flocks) { flocks.sumOf { it.effectiveBirdCount } }
+    val bioMortalityLogs = remember(mortalityLogs) {
+        com.example.poultryapp.data.local.FlockExitAnalytics.filterBiologicalMortality(mortalityLogs)
+    }
 
     val flockRequirements = remember(flocks, currentSeason, customBreeds, farmAmbientTemp) {
         flocks.associate { flock ->
@@ -180,13 +201,15 @@ fun FlocksScreen(
                         FlocksSubTab.OVERVIEW -> "مدیریت گله‌ها"
                         FlocksSubTab.EGG_PRODUCTION -> "ثبت و آمار تخم‌گذاری"
                         FlocksSubTab.MORTALITY -> "آمار و پایش تلفات فارم"
+                        FlocksSubTab.SALES_SLAUGHTER -> "فروش و کشتار پرنده"
                         FlocksSubTab.FEED_WATER -> "پایش دان و آب زنده"
                         FlocksSubTab.CALENDAR -> "تقویم و برنامه‌ریزی فارم"
                     },
                     subtitle = when (activeSubTab) {
                         FlocksSubTab.OVERVIEW -> "${toPersianDigits(flocks.size)} سالن فعال | ${toPersianDigits(totalBirds)} قطعه پرنده"
                         FlocksSubTab.EGG_PRODUCTION -> "${toPersianDigits(eggProductions.size)} روز ثبت‌شده | مجموع ${toPersianDigits(eggProductions.sumOf { it.healthyCount })} عدد تخم‌مرغ سالم"
-                        FlocksSubTab.MORTALITY -> "${toPersianDigits(mortalityLogs.sumOf { it.count })} قطعه کل تلفات ثبت‌شده"
+                        FlocksSubTab.MORTALITY -> "${toPersianDigits(bioMortalityLogs.sumOf { it.count })} قطعه کل تلفات زیستی"
+                        FlocksSubTab.SALES_SLAUGHTER -> "${toPersianDigits(birdSales.sumOf { it.birdCount })} فروش | ${toPersianDigits(birdSlaughters.sumOf { it.birdCount })} کشتار"
                         FlocksSubTab.FEED_WATER -> "پایش نرخ مصرف، وضعیت زنده و شارژ جیره"
                         FlocksSubTab.CALENDAR -> "${toPersianDigits(schedules.size)} برنامه و یادآور فعال"
                     },
@@ -194,6 +217,7 @@ fun FlocksScreen(
                         FlocksSubTab.OVERVIEW -> com.example.poultryapp.R.drawable.ic_farm_flocks
                         FlocksSubTab.EGG_PRODUCTION -> com.example.poultryapp.R.drawable.ic_farm_egg
                         FlocksSubTab.MORTALITY -> com.example.poultryapp.R.drawable.ic_farm_health
+                        FlocksSubTab.SALES_SLAUGHTER -> com.example.poultryapp.R.drawable.ic_farm_flocks
                         FlocksSubTab.FEED_WATER -> com.example.poultryapp.R.drawable.ic_farm_feed_water
                         FlocksSubTab.CALENDAR -> com.example.poultryapp.R.drawable.ic_farm_calendar
                     },
@@ -267,6 +291,23 @@ fun FlocksScreen(
                     shape = RoundedCornerShape(FarmDimens.ButtonRadius)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "ثبت تلفات جدید")
+                }
+            } else if (activeSubTab == FlocksSubTab.SALES_SLAUGHTER) {
+                FloatingActionButton(
+                    onClick = {
+                        if (exitViewMode == "SLAUGHTERS") {
+                            slaughterTargetFlockId = selectedExitFlockFilterId ?: flocks.firstOrNull()?.id
+                            showSlaughterBirdsDialog = true
+                        } else {
+                            sellTargetFlockId = selectedExitFlockFilterId ?: flocks.firstOrNull()?.id
+                            showSellBirdsDialog = true
+                        }
+                    },
+                    containerColor = if (exitViewMode == "SLAUGHTERS") MaterialTheme.colorScheme.secondary else HealthGreen,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(FarmDimens.ButtonRadius)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = if (exitViewMode == "SLAUGHTERS") "ثبت کشتار" else "ثبت فروش")
                 }
             }
         }
@@ -930,7 +971,7 @@ fun FlocksScreen(
                                             )
                                         }
 
-                                        // Footer Tier 1: Tracking Status Badges & Quick Action Icons
+                                        // Footer Tier 1: Tracking Status Badges & Edit/Delete Icons
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -953,30 +994,6 @@ fun FlocksScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                                             ) {
-                                                OutlinedButton(
-                                                    onClick = {
-                                                        mortalityTargetFlockId = flock.id
-                                                        showLogMortalityDialog = true
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                                    modifier = Modifier.height(30.dp)
-                                                ) {
-                                                    Text("📉 تلفات", style = MaterialTheme.typography.labelSmall)
-                                                }
-                                                if (flocks.size > 1) {
-                                                    OutlinedButton(
-                                                        onClick = { transferringSourceFlock = flock },
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                                        modifier = Modifier.height(30.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(13.dp))
-                                                        Spacer(modifier = Modifier.width(3.dp))
-                                                        Text("انتقال", style = MaterialTheme.typography.labelSmall)
-                                                    }
-                                                }
                                                 IconButton(
                                                     onClick = { editingFlock = flock },
                                                     modifier = Modifier.size(30.dp)
@@ -998,6 +1015,66 @@ fun FlocksScreen(
                                                         tint = HealthRed,
                                                         modifier = Modifier.size(16.dp)
                                                     )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(FarmDimens.Space8))
+
+                                        // Quick Flock Exit & Transfer Actions (Wrapped safely via FlowRow)
+                                        FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    sellTargetFlockId = flock.id
+                                                    showSellBirdsDialog = true
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = HealthGreen),
+                                                border = BorderStroke(1.dp, HealthGreen.copy(alpha = 0.6f)),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("💰 فروش", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                            }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    slaughterTargetFlockId = flock.id
+                                                    showSlaughterBirdsDialog = true
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("🔪 کشتار", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                            }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    mortalityTargetFlockId = flock.id
+                                                    showLogMortalityDialog = true
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("📉 تلفات", style = MaterialTheme.typography.labelSmall)
+                                            }
+                                            if (flocks.size > 1) {
+                                                OutlinedButton(
+                                                    onClick = { transferringSourceFlock = flock },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text("انتقال", style = MaterialTheme.typography.labelSmall)
                                                 }
                                             }
                                         }
@@ -1403,17 +1480,21 @@ fun FlocksScreen(
         }
         FlocksSubTab.MORTALITY -> {
             val todayJalali = remember { com.example.poultryapp.engine.JalaliDateHelper.getJalaliDate().toStandardString() }
-            val totalMortalityCount = remember(mortalityLogs) { mortalityLogs.sumOf { it.count } }
-            val todayMortalityCount = remember(mortalityLogs, todayJalali) {
-                mortalityLogs.filter { it.dateJalaliStr == todayJalali }.sumOf { it.count }
+            val totalMortalityCount = remember(bioMortalityLogs) { bioMortalityLogs.sumOf { it.count } }
+            val todayMortalityCount = remember(bioMortalityLogs, todayJalali) {
+                bioMortalityLogs.filter { it.dateJalaliStr == todayJalali }.sumOf { it.count }
             }
-            val overallMortalityRate = remember(totalBirds, totalMortalityCount) {
-                val totalInitialOrCurrent = totalBirds + totalMortalityCount
-                if (totalInitialOrCurrent > 0) (totalMortalityCount.toDouble() / totalInitialOrCurrent * 100.0) else 0.0
+            val overallMortalityRate = remember(totalBirds, bioMortalityLogs, birdSales, birdSlaughters) {
+                com.example.poultryapp.data.local.FlockExitAnalytics.calculateCumulativeMortalityRatePercent(
+                    currentLiveBirds = totalBirds,
+                    mortalityLogs = bioMortalityLogs,
+                    birdSales = birdSales,
+                    birdSlaughters = birdSlaughters
+                )
             }
-            val filteredMortalityLogs = remember(mortalityLogs, selectedMortalityFlockFilterId) {
-                if (selectedMortalityFlockFilterId == null) mortalityLogs
-                else mortalityLogs.filter { it.flockId == selectedMortalityFlockFilterId }
+            val filteredMortalityLogs = remember(bioMortalityLogs, selectedMortalityFlockFilterId) {
+                if (selectedMortalityFlockFilterId == null) bioMortalityLogs
+                else bioMortalityLogs.filter { it.flockId == selectedMortalityFlockFilterId }
             }
 
             LazyColumn(
@@ -1440,7 +1521,7 @@ fun FlocksScreen(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(FarmDimens.Space12)) {
-                                    Text("کل تلفات ثبت‌شده", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("کل تلفات زیستی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         "${toPersianDigits(totalMortalityCount)} قطعه",
@@ -1481,13 +1562,18 @@ fun FlocksScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
-                                    Text("نرخ تجمعی تلفات فارم", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("نرخ تجمعی تلفات واقعی فارم", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
                                         "${toPersianDigits(String.format(java.util.Locale.US, "%.2f", overallMortalityRate))}٪",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = if (overallMortalityRate > 5.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "فروش و کشتار در این شاخص لحاظ نمی‌شوند",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 Button(
@@ -1495,6 +1581,7 @@ fun FlocksScreen(
                                         mortalityTargetFlockId = flocks.firstOrNull()?.id
                                         showLogMortalityDialog = true
                                     },
+                                    enabled = flocks.isNotEmpty(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -1514,16 +1601,18 @@ fun FlocksScreen(
                         Column {
                             Text("فیلتر بر اساس سالن/گله:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(6.dp))
-                            Row(
+                            LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                FilterChip(
-                                    selected = selectedMortalityFlockFilterId == null,
-                                    onClick = { selectedMortalityFlockFilterId = null },
-                                    label = { Text("همه سالن‌ها") }
-                                )
-                                flocks.forEach { f ->
+                                item(key = "mort_filter_all") {
+                                    FilterChip(
+                                        selected = selectedMortalityFlockFilterId == null,
+                                        onClick = { selectedMortalityFlockFilterId = null },
+                                        label = { Text("همه سالن‌ها") }
+                                    )
+                                }
+                                items(items = flocks, key = { "mort_filter_${it.id}" }) { f ->
                                     FilterChip(
                                         selected = selectedMortalityFlockFilterId == f.id,
                                         onClick = { selectedMortalityFlockFilterId = f.id },
@@ -1541,8 +1630,8 @@ fun FlocksScreen(
                         EmptyStateView(
                             imageRes = com.example.poultryapp.R.drawable.ic_farm_health,
                             title = "هیچ تلفاتی ثبت نشده است",
-                            message = "خوشبختانه تاکنون هیچ تلفاتی در این بخش ثبت نشده است. گله‌ها در سلامت کامل به سر می‌برند.",
-                            actionButtonText = "+ ثبت تلفات یا خروج پرنده",
+                            message = "خوشبختانه تاکنون هیچ تلفات زیستی در این بخش ثبت نشده است. فروش و کشتار پرندگان در تب «فروش و کشتار» ثبت می‌شود.",
+                            actionButtonText = "+ ثبت تلفات جدید",
                             onActionClick = {
                                 mortalityTargetFlockId = flocks.firstOrNull()?.id
                                 showLogMortalityDialog = true
@@ -1552,7 +1641,7 @@ fun FlocksScreen(
                 } else {
                     item {
                         Text(
-                            text = "سوابق ثبت‌شده تلفات و خروج پرندگان:",
+                            text = "سوابق ثبت‌شده تلفات زیستی:",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1561,7 +1650,7 @@ fun FlocksScreen(
 
                     items(
                         items = filteredMortalityLogs,
-                        key = { it.id }
+                        key = { "bio_mort_${it.id}" }
                     ) { log ->
                         Card(
                             shape = RoundedCornerShape(12.dp),
@@ -1596,7 +1685,7 @@ fun FlocksScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = log.dateJalaliStr,
+                                                text = toPersianDigits(log.dateJalaliStr),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -1606,12 +1695,12 @@ fun FlocksScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
-                                            color = if (log.reason.isTrueMortality) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
                                         ) {
                                             Text(
                                                 text = log.reason.titleFa,
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = if (log.reason.isTrueMortality) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                color = MaterialTheme.colorScheme.error,
                                                 fontWeight = FontWeight.SemiBold,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
@@ -1642,6 +1731,492 @@ fun FlocksScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(FarmDimens.Space40))
+                }
+            }
+        }
+        FlocksSubTab.SALES_SLAUGHTER -> {
+            val isWorker = userRole == UserRole.WORKER
+            val filteredSales = remember(birdSales, selectedExitFlockFilterId) {
+                if (selectedExitFlockFilterId == null) birdSales
+                else birdSales.filter { it.flockId == selectedExitFlockFilterId }
+            }
+            val filteredSlaughters = remember(birdSlaughters, selectedExitFlockFilterId) {
+                if (selectedExitFlockFilterId == null) birdSlaughters
+                else birdSlaughters.filter { it.flockId == selectedExitFlockFilterId }
+            }
+            val totalSoldBirds = remember(filteredSales) { filteredSales.sumOf { it.birdCount } }
+            val totalSaleRevenue = remember(filteredSales) { filteredSales.sumOf { it.totalRevenueTomans } }
+            val totalSlaughteredBirds = remember(filteredSlaughters) { filteredSlaughters.sumOf { it.birdCount } }
+            val avgCarcassYield = remember(filteredSlaughters) {
+                filteredSlaughters.mapNotNull { it.carcassYieldPercent }.takeIf { it.isNotEmpty() }?.average()
+            }
+
+            val timelineItems = remember(filteredSales, filteredSlaughters, exitViewMode) {
+                val combined = mutableListOf<BirdExitUiItem>()
+                if (exitViewMode != "SLAUGHTERS") {
+                    filteredSales.forEach { combined.add(BirdExitUiItem.Sale(it)) }
+                }
+                if (exitViewMode != "SALES") {
+                    filteredSlaughters.forEach { combined.add(BirdExitUiItem.Slaughter(it)) }
+                }
+                combined.sortedByDescending { it.timestampMillis }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = FarmDimens.Space16,
+                    end = FarmDimens.Space16,
+                    top = FarmDimens.Space8,
+                    bottom = 88.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(FarmDimens.Space12)
+            ) {
+                // Separate KPI Summary Cards: Sale (Financial) vs Slaughter (Technical, NO money)
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Sale KPI Card (Green)
+                        Surface(
+                            shape = RoundedCornerShape(FarmDimens.CardRadius),
+                            color = if (isDark) HealthGreenContainerDark else HealthGreenContainer,
+                            border = BorderStroke(1.dp, (if (isDark) HealthGreenDark else HealthGreen).copy(alpha = 0.4f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(FarmDimens.Space12)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Payments,
+                                        contentDescription = null,
+                                        tint = if (isDark) HealthGreenDark else HealthGreen,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "فروش پرنده",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) HealthGreenTextDark else HealthGreenText
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${toPersianDigits(totalSoldBirds)} قطعه",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) HealthGreenDark else HealthGreen
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                if (!isWorker && totalSaleRevenue > 0) {
+                                    Text(
+                                        text = "${toPersianDigits(String.format(java.util.Locale.US, "%,.0f", totalSaleRevenue))} تومان",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) HealthGreenTextDark else HealthGreenText
+                                    )
+                                } else {
+                                    Text(
+                                        text = if (isWorker) "مبالغ مالی مخفی (کارگر)" else "${toPersianDigits(filteredSales.size)} نوبت فروش",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Slaughter KPI Card (Amber / Secondary - Strictly NON-financial)
+                        Surface(
+                            shape = RoundedCornerShape(FarmDimens.CardRadius),
+                            color = if (isDark) FeedAmberContainerDark else FeedAmberContainer.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, (if (isDark) FeedAmberDark else FeedAmber).copy(alpha = 0.45f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(FarmDimens.Space12)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.ContentCut,
+                                        contentDescription = null,
+                                        tint = if (isDark) FeedAmberDark else FeedAmber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "کشتار پرنده",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) FeedAmberDark else FeedAmberText
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${toPersianDigits(totalSlaughteredBirds)} قطعه",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) FeedAmberDark else FeedAmber
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (avgCarcassYield != null) {
+                                        "میانگین راندمان لاشه: ${toPersianDigits(String.format(java.util.Locale.US, "%.1f", avgCarcassYield))}٪"
+                                    } else {
+                                        "${toPersianDigits(filteredSlaughters.size)} نوبت کشتار (غیردرآمدی)"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isDark) FeedAmberDark.copy(alpha = 0.9f) else FeedAmberText
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Quick Actions Row: Separate buttons for Sell & Slaughter
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                sellTargetFlockId = selectedExitFlockFilterId ?: flocks.firstOrNull()?.id
+                                showSellBirdsDialog = true
+                            },
+                            enabled = flocks.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = HealthGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ثبت فروش پرنده", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                slaughterTargetFlockId = selectedExitFlockFilterId ?: flocks.firstOrNull()?.id
+                                showSlaughterBirdsDialog = true
+                            },
+                            enabled = flocks.isNotEmpty(),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isDark) FeedAmberContainerDark else FeedAmberContainer,
+                                contentColor = if (isDark) FeedAmberDark else FeedAmberText
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ثبت کشتار پرنده", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Mode filter chips (All / Sales / Slaughters)
+                item {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item(key = "exit_mode_all") {
+                            FilterChip(
+                                selected = exitViewMode == "ALL",
+                                onClick = { exitViewMode = "ALL" },
+                                label = { Text("همه (${toPersianDigits(filteredSales.size + filteredSlaughters.size)})") }
+                            )
+                        }
+                        item(key = "exit_mode_sales") {
+                            FilterChip(
+                                selected = exitViewMode == "SALES",
+                                onClick = { exitViewMode = "SALES" },
+                                label = { Text("💰 فروش‌ها (${toPersianDigits(filteredSales.size)})") }
+                            )
+                        }
+                        item(key = "exit_mode_slaughters") {
+                            FilterChip(
+                                selected = exitViewMode == "SLAUGHTERS",
+                                onClick = { exitViewMode = "SLAUGHTERS" },
+                                label = { Text("🔪 کشتارها (${toPersianDigits(filteredSlaughters.size)})") }
+                            )
+                        }
+                    }
+                }
+
+                // Flock filter chips
+                if (flocks.size > 1) {
+                    item {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            item(key = "exit_flock_all") {
+                                FilterChip(
+                                    selected = selectedExitFlockFilterId == null,
+                                    onClick = { selectedExitFlockFilterId = null },
+                                    label = { Text("همه سالن‌ها") }
+                                )
+                            }
+                            items(items = flocks, key = { "exit_flock_${it.id}" }) { f ->
+                                FilterChip(
+                                    selected = selectedExitFlockFilterId == f.id,
+                                    onClick = { selectedExitFlockFilterId = f.id },
+                                    label = { Text(f.name) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (timelineItems.isEmpty()) {
+                    item {
+                        EmptyStateView(
+                            imageRes = com.example.poultryapp.R.drawable.ic_farm_flocks,
+                            title = "هنوز فروش یا کشتاری ثبت نشده است",
+                            message = "فروش پرندگان (سودآور با امکان ثبت خودکار درآمد) و کشتار پرندگان (همراه با سن پرنده، تاریخ و راندمان لاشه) به صورت کاملاً جداگانه از تلفات در اینجا ثبت می‌شوند.",
+                            actionButtonText = "+ ثبت فروش پرنده",
+                            onActionClick = {
+                                if (flocks.isNotEmpty()) {
+                                    sellTargetFlockId = flocks.firstOrNull()?.id
+                                    showSellBirdsDialog = true
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    item {
+                        Text(
+                            text = "سوابق فروش و کشتار (${toPersianDigits(timelineItems.size)} مورد):",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    items(items = timelineItems, key = { it.key }) { item ->
+                        when (item) {
+                            is BirdExitUiItem.Sale -> {
+                                val sale = item.log
+                                val saleAccent = if (isDark) HealthGreenDark else HealthGreen
+                                val saleBadgeBg = if (isDark) HealthGreenContainerDark else HealthGreenContainer
+                                val saleBadgeText = if (isDark) HealthGreenTextDark else HealthGreenText
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    border = BorderStroke(1.dp, saleAccent.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = saleBadgeBg,
+                                                    modifier = Modifier.padding(end = 8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${toPersianDigits(sale.birdCount)} قطعه",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = saleAccent,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                                Column {
+                                                    Text(
+                                                        text = sale.flockName,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        text = "تاریخ فروش: ${toPersianDigits(sale.dateJalaliStr)}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = saleBadgeBg
+                                                ) {
+                                                    Text(
+                                                        text = "فروش پرنده",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = saleBadgeText,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                IconButton(
+                                                    onClick = { deletingBirdSaleId = sale.id },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.DeleteOutline,
+                                                        contentDescription = "حذف رکورد فروش",
+                                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        val detailChips = buildList {
+                                            if (sale.liveWeightKg != null && sale.liveWeightKg > 0.0) {
+                                                val wStr = if (sale.liveWeightKg % 1.0 == 0.0) sale.liveWeightKg.toInt().toString() else String.format(java.util.Locale.US, "%.1f", sale.liveWeightKg)
+                                                add("وزن زنده: ${toPersianDigits(wStr)} کیلوگرم")
+                                            }
+                                            if (!sale.buyerName.isNullOrBlank()) {
+                                                add("خریدار: ${sale.buyerName}")
+                                            }
+                                            if (!isWorker && sale.totalRevenueTomans > 0.0) {
+                                                add("مبلغ کل: ${toPersianDigits(String.format(java.util.Locale.US, "%,.0f", sale.totalRevenueTomans))} تومان")
+                                            }
+                                            if (!isWorker && sale.unitPriceTomans != null && sale.unitPriceTomans > 0.0) {
+                                                val unitLabel = if (sale.liveWeightKg != null && sale.liveWeightKg > 0.0) "قیمت هر کیلو" else "قیمت هر قطعه"
+                                                add("$unitLabel: ${toPersianDigits(String.format(java.util.Locale.US, "%,.0f", sale.unitPriceTomans))} تومان")
+                                            }
+                                            if (!isWorker && sale.linkedTransactionId != null) {
+                                                add("سند درآمد ثبت‌شده")
+                                            }
+                                        }
+                                        if (detailChips.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = detailChips.joinToString("  •  "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = saleBadgeText,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        if (!sale.notes.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "توضیحات: ${sale.notes}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            is BirdExitUiItem.Slaughter -> {
+                                val slaughter = item.log
+                                val slAccent = if (isDark) FeedAmberDark else FeedAmber
+                                val slBadgeBg = if (isDark) FeedAmberContainerDark else FeedAmberContainer
+                                val slBadgeText = if (isDark) FeedAmberDark else FeedAmberText
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    border = BorderStroke(1.dp, slAccent.copy(alpha = 0.4f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = slBadgeBg,
+                                                    modifier = Modifier.padding(end = 8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${toPersianDigits(slaughter.birdCount)} قطعه",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = slAccent,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                                Column {
+                                                    Text(
+                                                        text = slaughter.flockName,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        text = "تاریخ کشتار: ${toPersianDigits(slaughter.dateJalaliStr)}  •  سن پرنده: ${toPersianDigits(slaughter.birdAgeDays)} روز",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = slBadgeBg
+                                                ) {
+                                                    Text(
+                                                        text = "کشتار پرنده",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = slBadgeText,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                IconButton(
+                                                    onClick = { deletingBirdSlaughterId = slaughter.id },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.DeleteOutline,
+                                                        contentDescription = "حذف رکورد کشتار",
+                                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        val techChips = buildList {
+                                            if (slaughter.liveWeightKg != null && slaughter.liveWeightKg > 0.0) {
+                                                val w = if (slaughter.liveWeightKg % 1.0 == 0.0) slaughter.liveWeightKg.toInt().toString() else String.format(java.util.Locale.US, "%.1f", slaughter.liveWeightKg)
+                                                add("وزن زنده: ${toPersianDigits(w)} کیلوگرم")
+                                            }
+                                            if (slaughter.carcassWeightKg != null && slaughter.carcassWeightKg > 0.0) {
+                                                val cw = if (slaughter.carcassWeightKg % 1.0 == 0.0) slaughter.carcassWeightKg.toInt().toString() else String.format(java.util.Locale.US, "%.1f", slaughter.carcassWeightKg)
+                                                add("وزن لاشه: ${toPersianDigits(cw)} کیلوگرم")
+                                            }
+                                            val yieldPct = slaughter.carcassYieldPercent
+                                            if (yieldPct != null) {
+                                                add("راندمان لاشه: ${toPersianDigits(String.format(java.util.Locale.US, "%.1f", yieldPct))}٪")
+                                            }
+                                        }
+                                        if (techChips.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = techChips.joinToString("  •  "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = slBadgeText,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        if (!slaughter.notes.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "توضیحات/کشتارگاه: ${slaughter.notes}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1935,6 +2510,137 @@ fun FlocksScreen(
         )
     }
 
+    // Sell Birds Dialog
+    if (showSellBirdsDialog) {
+        SellBirdsDialog(
+            flocks = flocks,
+            initialFlockId = sellTargetFlockId,
+            isWorkerMode = (userRole == UserRole.WORKER),
+            onDismiss = { showSellBirdsDialog = false },
+            onSave = { flockId, count, liveWeightKg, unitPriceTomans, totalRevenueTomans, buyerName, dateStr, notes, createFinanceTx ->
+                onSellBirds?.invoke(
+                    flockId,
+                    count,
+                    liveWeightKg,
+                    unitPriceTomans,
+                    totalRevenueTomans,
+                    buyerName,
+                    dateStr,
+                    notes,
+                    createFinanceTx
+                )
+                showSellBirdsDialog = false
+            }
+        )
+    }
+
+    // Slaughter Birds Dialog
+    if (showSlaughterBirdsDialog) {
+        SlaughterBirdsDialog(
+            flocks = flocks,
+            initialFlockId = slaughterTargetFlockId,
+            onDismiss = { showSlaughterBirdsDialog = false },
+            onSave = { flockId, count, birdAgeDays, liveWeightKg, carcassWeightKg, dateStr, notes ->
+                onSlaughterBirds?.invoke(
+                    flockId,
+                    count,
+                    birdAgeDays,
+                    liveWeightKg,
+                    carcassWeightKg,
+                    dateStr,
+                    notes
+                )
+                showSlaughterBirdsDialog = false
+            }
+        )
+    }
+
+    // Delete Bird Sale Confirmation Dialog
+    if (deletingBirdSaleId != null) {
+        AlertDialog(
+            onDismissRequest = { deletingBirdSaleId = null },
+            title = {
+                Text(
+                    text = "حذف رکورد فروش پرنده",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "آیا از حذف این رکورد فروش اطمینان دارید؟ پرندگان فروخته‌شده به آمار زنده گله بازگردانده می‌شوند و در صورت وجود سند درآمد متصل، آن تراکنش مالی نیز حذف خواهد شد.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletingBirdSaleId?.let { id ->
+                            onDeleteBirdSale?.invoke(id)
+                        }
+                        deletingBirdSaleId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = HealthRed),
+                    shape = RoundedCornerShape(FarmDimens.ButtonRadius)
+                ) {
+                    Text("حذف و بازگردانی", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { deletingBirdSaleId = null },
+                    shape = RoundedCornerShape(FarmDimens.ButtonRadius)
+                ) {
+                    Text("انصراف")
+                }
+            },
+            shape = RoundedCornerShape(FarmDimens.DialogRadius)
+        )
+    }
+
+    // Delete Bird Slaughter Confirmation Dialog
+    if (deletingBirdSlaughterId != null) {
+        AlertDialog(
+            onDismissRequest = { deletingBirdSlaughterId = null },
+            title = {
+                Text(
+                    text = "حذف رکورد کشتار پرنده",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "آیا از حذف این رکورد کشتار اطمینان دارید؟ با حذف این رکورد، تعداد پرندگان به آمار زنده گله بازگردانده می‌شود.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletingBirdSlaughterId?.let { id ->
+                            onDeleteBirdSlaughter?.invoke(id)
+                        }
+                        deletingBirdSlaughterId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = HealthRed),
+                    shape = RoundedCornerShape(FarmDimens.ButtonRadius)
+                ) {
+                    Text("حذف و بازگردانی پرندگان", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { deletingBirdSlaughterId = null },
+                    shape = RoundedCornerShape(FarmDimens.ButtonRadius)
+                ) {
+                    Text("انصراف")
+                }
+            },
+            shape = RoundedCornerShape(FarmDimens.DialogRadius)
+        )
+    }
+
     // Thermal Stress Management Solutions Dialog
     if (viewingThermalGuideForFlock != null) {
         val (targetFlock, guide) = viewingThermalGuideForFlock!!
@@ -1943,6 +2649,24 @@ fun FlocksScreen(
             guide = guide,
             onDismiss = { viewingThermalGuideForFlock = null }
         )
+    }
+}
+
+private sealed interface BirdExitUiItem {
+    val key: String
+    val timestampMillis: Long
+    val dateJalaliStr: String
+
+    data class Sale(val log: com.example.poultryapp.data.local.BirdSaleLog) : BirdExitUiItem {
+        override val key: String = "sale_${log.id}"
+        override val timestampMillis: Long = log.timestampMillis
+        override val dateJalaliStr: String = log.dateJalaliStr
+    }
+
+    data class Slaughter(val log: com.example.poultryapp.data.local.BirdSlaughterLog) : BirdExitUiItem {
+        override val key: String = "slaughter_${log.id}"
+        override val timestampMillis: Long = log.timestampMillis
+        override val dateJalaliStr: String = log.dateJalaliStr
     }
 }
 

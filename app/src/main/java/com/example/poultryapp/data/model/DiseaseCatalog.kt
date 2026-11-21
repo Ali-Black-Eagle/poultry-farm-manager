@@ -1561,17 +1561,17 @@ object DiseaseCatalog {
     }
 
     fun findSymptomsFromVoiceText(text: String): List<ClinicalSymptom> {
-        val norm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(text)
-        val normClean = norm.replace("‌", " ").trim()
+        val norm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(text).normalized
+        val normClean = norm.replace("\u200C", " ").trim()
         val normNoSpace = normClean.replace(" ", "")
         val words = normClean.split(" ").filter { it.isNotBlank() }
 
         return allSymptoms.filter { sym ->
-            val titleNorm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(sym.titleFa)
+            val titleNorm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(sym.titleFa).normalized
             (titleNorm.length >= 4 && normClean.contains(titleNorm)) ||
             sym.voiceAliases.any { alias ->
-                val aliasNorm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(alias)
-                val aliasClean = aliasNorm.replace("‌", " ").trim()
+                val aliasNorm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(alias).normalized
+                val aliasClean = aliasNorm.replace("\u200C", " ").trim()
                 if (aliasClean.isBlank()) false
                 else if (aliasClean.contains(" ")) {
                     // Multi-word alias: entire phrase or space-less phrase must be contained in the input
@@ -1598,11 +1598,11 @@ object DiseaseCatalog {
     )
 
     fun findDiseaseByName(query: String): DiseaseInfo? {
-        val norm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(query)
+        val norm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(query).normalized
         if (norm.isBlank()) return null
 
         return allDiseases.mapNotNull { d ->
-            val dName = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(d.nameFa)
+            val dName = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(d.nameFa).normalized
             val subNames = dName.split("(", ")", "/", "•", "-").map { it.trim() }.filter { it.length >= 3 }
             val idPhrase = d.id.replace("_", " ")
 
@@ -1631,14 +1631,14 @@ object DiseaseCatalog {
     }
 
     fun searchDiseases(query: String, species: BirdSpecies?): List<DiseaseInfo> {
-        val norm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(query)
+        val norm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(query).normalized
         val baseList = if (species != null) getDiseasesForSpecies(species) else allDiseases
         if (norm.isBlank()) return baseList
 
         return baseList.filter { d ->
-            val nameNorm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(d.nameFa)
+            val nameNorm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(d.nameFa).normalized
             val sciNorm = d.scientificName.lowercase()
-            val descNorm = com.example.poultryapp.voice.PersianVoiceNormalizer.normalize(d.fullSymptomsDescriptionFa)
+            val descNorm = com.example.poultryapp.assistant.core.normalize.TextNormalizer.normalize(d.fullSymptomsDescriptionFa).normalized
             nameNorm.contains(norm) || sciNorm.contains(norm.lowercase()) || descNorm.contains(norm)
         }
     }

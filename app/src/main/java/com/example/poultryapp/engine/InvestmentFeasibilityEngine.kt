@@ -48,11 +48,13 @@ object InvestmentFeasibilityEngine {
         val profitPerBird = if (survivingBirds > 0) netProfit / survivingBirds else 0.0
 
         // نقطه سر به سر (روز رسیدن به برابری سرمایه با ارزش گله)
-        val breakEvenDay = if (input.cycleDays > 10) {
-            ((totalWorkingCapital / (totalRevenue.coerceAtLeast(1.0))) * input.cycleDays).roundToInt()
+        val breakEvenDay = if (netProfit > 0 && totalRevenue > totalWorkingCapital && input.cycleDays > 10) {
+            ((totalWorkingCapital / totalRevenue) * input.cycleDays).roundToInt()
                 .coerceIn(1, input.cycleDays)
-        } else {
+        } else if (netProfit > 0 && totalRevenue > totalWorkingCapital) {
             input.cycleDays
+        } else {
+            null
         }
 
         return FeasibilityResult(

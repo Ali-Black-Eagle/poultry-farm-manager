@@ -7,10 +7,14 @@ import com.example.poultryapp.data.local.RationIngredient
 import com.example.poultryapp.data.local.RationItemType
 import com.example.poultryapp.data.local.RationPlan
 import com.example.poultryapp.data.local.RationPricingMode
+import com.example.poultryapp.data.local.WarehouseCategory
+import com.example.poultryapp.data.local.WarehouseItem
 import com.example.poultryapp.data.model.ComprehensiveFeedCatalog
 import com.example.poultryapp.data.model.FeedCategory
 import com.example.poultryapp.engine.SolarDaylightCalculator
+import com.example.poultryapp.receiver.LiveFeedWaterNotificationManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -249,5 +253,63 @@ class NewFeaturesValidationTest {
         assertEquals(500, restoredFlock.birdCount)
         assertEquals(500, restoredFlock.effectiveBirdCount)
         assertEquals(300, restoredFlock.subGroups[0].birdCount)
+    }
+
+    // ==========================================
+    // ۵. تست احترام به خاموش بودن هشدار کمبود موجودی در انبار
+    // ==========================================
+    @Test
+    fun testWarehouseLowStockAlertToggleRespect() {
+        // کالای میان دان که هشدار کمبود موجودی آن خاموش شده است (minAlertThreshold = 0.0)
+        val disabledFeedAlertItem = WarehouseItem(
+            id = 1L,
+            name = "میان دان",
+            category = WarehouseCategory.FEED,
+            currentStock = 5.0,
+            unit = "کیلوگرم",
+            minAlertThreshold = 0.0
+        )
+
+        // حتی با باقی‌ماندن کمتر از ۳ روز یا موجودی صفر، وقتی هشدار خاموش است نباید اعلان صادر شود
+        assertFalse(
+            LiveFeedWaterNotificationManager.shouldNotifyWarehouseLowStock(
+                item = disabledFeedAlertItem,
+                daysRemaining = 1.0,
+                feedWaterAlertsEnabled = true
+            )
+        )
+        assertFalse(
+            LiveFeedWaterNotificationManager.shouldNotifyWarehouseLowStock(
+                item = disabledFeedAlertItem.copy(currentStock = 0.0),
+                daysRemaining = 0.0,
+                feedWaterAlertsEnabled = true
+            )
+        )
+
+        // وقتی هشدار روی همین کالا روشن شود (minAlertThreshold = 50.0)
+        val enabledFeedAlertItem = disabledFeedAlertItem.copy(minAlertThreshold = 50.0)
+        assertTrue(
+            LiveFeedWaterNotificationManager.shouldNotifyWarehouseLowStock(
+                item = enabledFeedAlertItem,
+                daysRemaining = 2.0,
+                feedWaterAlertsEnabled = true
+            )
+        )
+        assertTrue(
+            LiveFeedWaterNotificationManager.shouldNotifyWarehouseLowStock(
+                item = enabledFeedAlertItem.copy(currentStock = 40.0),
+                daysRemaining = 10.0,
+                feedWaterAlertsEnabled = true
+            )
+        )
+
+        // وقتی تنظیمات کلی هشدار دان و آب خاموش باشد، نباید اعلان صادر شود
+        assertFalse(
+            LiveFeedWaterNotificationManager.shouldNotifyWarehouseLowStock(
+                item = enabledFeedAlertItem,
+                daysRemaining = 1.0,
+                feedWaterAlertsEnabled = false
+            )
+        )
     }
 }

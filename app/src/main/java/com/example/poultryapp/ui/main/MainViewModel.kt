@@ -46,6 +46,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val financialRepo = com.example.poultryapp.data.repository.FinancialRepository(application)
     private val rationRepo = com.example.poultryapp.data.repository.RationRepository(application)
     private val mortalityRepo = MortalityRepository(application)
+    private val birdExitRepo = com.example.poultryapp.data.repository.BirdExitRepository(application)
     private val contactRepo = FarmContactRepository(application)
     private val biosecurityRepo = com.example.poultryapp.data.repository.BiosecurityRepository(application)
 
@@ -109,6 +110,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _mortalityLogs = MutableStateFlow<List<FlockMortalityLog>>(emptyList())
     val mortalityLogs: StateFlow<List<FlockMortalityLog>> = _mortalityLogs.asStateFlow()
 
+    private val _birdSales = MutableStateFlow<List<com.example.poultryapp.data.local.BirdSaleLog>>(emptyList())
+    val birdSales: StateFlow<List<com.example.poultryapp.data.local.BirdSaleLog>> = _birdSales.asStateFlow()
+
+    private val _birdSlaughters = MutableStateFlow<List<com.example.poultryapp.data.local.BirdSlaughterLog>>(emptyList())
+    val birdSlaughters: StateFlow<List<com.example.poultryapp.data.local.BirdSlaughterLog>> = _birdSlaughters.asStateFlow()
+
     private val _farmContacts = MutableStateFlow<List<FarmContact>>(emptyList())
     val farmContacts: StateFlow<List<FarmContact>> = _farmContacts.asStateFlow()
 
@@ -136,6 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeRationPlans()
         observeCustomFeedIngredients()
         observeMortalityLogs()
+        observeBirdExits()
         observeFarmContacts()
         observeBiosecurity()
         loadSettings()
@@ -321,6 +329,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val flock = _flocks.value.find { it.id == flockId } ?: return@launch
             flockRepo.updateFlock(flock.copy(isFeedEnabled = isEnabled))
+            if (!isEnabled) {
+                AlarmScheduler.cancelChargeWarningAlarms(getApplication(), flockId, ChargeItemType.FEED)
+            }
             loadChargeDataForSelectedFlock()
             LiveFeedWaterNotificationManager.updateAllLowNotifications(getApplication())
         }
@@ -330,6 +341,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val flock = _flocks.value.find { it.id == flockId } ?: return@launch
             flockRepo.updateFlock(flock.copy(isWaterEnabled = isEnabled))
+            if (!isEnabled) {
+                AlarmScheduler.cancelChargeWarningAlarms(getApplication(), flockId, ChargeItemType.WATER)
+            }
             loadChargeDataForSelectedFlock()
             LiveFeedWaterNotificationManager.updateAllLowNotifications(getApplication())
         }
@@ -338,6 +352,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteFlock(flockId: Long) {
         viewModelScope.launch {
             flockRepo.deleteFlock(flockId)
+            AlarmScheduler.cancelChargeWarningAlarms(getApplication(), flockId)
+            LiveFeedWaterNotificationManager.cancelNotification(getApplication(), flockId)
             if (_selectedFlockId.value == flockId) {
                 _selectedFlockId.value = _flocks.value.firstOrNull { it.id != flockId }?.id
             }
@@ -413,6 +429,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteWarehouseItem(id: Long) {
         viewModelScope.launch {
             warehouseRepo.deleteWarehouseItem(id)
+            LiveFeedWaterNotificationManager.cancelWarehouseNotification(getApplication(), id)
         }
     }
 
@@ -599,6 +616,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 AlarmScheduler.cancelAlarm(getApplication(), 9999)
             }
+
+            // Immediately sync or cancel feed/water/warehouse notifications & alarms
+            LiveFeedWaterNotificationManager.updateAllLowNotifications(getApplication())
         }
     }
 
@@ -766,9 +786,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val id = eggRepo.insertEggProduction(eggProd)
             if (id > 0) {
-                if (_settings.value.isAutoAddEggsToWarehouseEnabled) {
-                    warehouseRepo.autoAddEggs(flockId, flockName, fertileCount = 0, tableCount = healthyCount, dateJalaliStr = todayJalali)
-                }
                 com.example.poultryapp.widget.FarmStatusWidgetProvider.sendUpdateBroadcast(getApplication())
             }
             onComplete?.invoke(id > 0)
@@ -1106,6 +1123,109 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteMortalityLog(id: Long) {
         viewModelScope.launch {
             mortalityRepo.deleteMortalityLog(id)
+        }
+    }
+
+    // ==================== BIRD SALES & SLAUGHTER (فروش و کشتار پرنده) ====================
+
+    private fun observeBirdExits() {
+        viewModelScope.launch {
+            birdExitRepo.getAllBirdSalesFlow().collect { list ->
+                _birdSales.value = list
+            }
+        }
+        viewModelScope.launch {
+            birdExitRepo.getAllBirdSlaughtersFlow().collect { list ->
+                _birdSlaughters.value = list
+            }
+        }
+    }
+
+    fun sellBirds(
+        flockId: Long,
+        birdCount: Int,
+        liveWeightKg: Double? = null,
+        unitPriceTomans: Double? = null,
+        totalRevenueTomans: Double = 0.0,
+        buyerName: String? = null,
+        dateJalaliStr: String? = null,
+        notes: String? = null,
+        createFinanceTransaction: Boolean = true,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            val flock = _flocks.value.find { it.id == flockId }
+            val flockName = flock?.name ?: "گله بدون نام"
+            val ageDays = flock?.ageDays ?: 1
+            val todayJalali = dateJalaliStr ?: com.example.poultryapp.engine.JalaliDateHelper.getJalaliDate().toStandardString()
+            val log = com.example.poultryapp.data.local.BirdSaleLog(
+                flockId = flockId,
+                flockName = flockName,
+                birdCount = birdCount,
+                birdAgeDays = ageDays,
+                liveWeightKg = liveWeightKg,
+                unitPriceTomans = unitPriceTomans,
+                totalRevenueTomans = totalRevenueTomans,
+                buyerName = buyerName?.takeIf { it.isNotBlank() },
+                dateJalaliStr = todayJalali,
+                timestampMillis = System.currentTimeMillis(),
+                notes = notes?.takeIf { it.isNotBlank() }
+            )
+            val id = birdExitRepo.insertBirdSaleLog(log, createFinanceTransaction)
+            if (id > 0L) {
+                com.example.poultryapp.widget.FarmStatusWidgetProvider.sendUpdateBroadcast(getApplication())
+            }
+            onComplete?.invoke(id > 0L)
+        }
+    }
+
+    fun deleteBirdSale(id: Long) {
+        viewModelScope.launch {
+            if (birdExitRepo.deleteBirdSaleLog(id)) {
+                com.example.poultryapp.widget.FarmStatusWidgetProvider.sendUpdateBroadcast(getApplication())
+            }
+        }
+    }
+
+    fun slaughterBirds(
+        flockId: Long,
+        birdCount: Int,
+        birdAgeDays: Int? = null,
+        liveWeightKg: Double? = null,
+        carcassWeightKg: Double? = null,
+        dateJalaliStr: String? = null,
+        notes: String? = null,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            val flock = _flocks.value.find { it.id == flockId }
+            val flockName = flock?.name ?: "گله بدون نام"
+            val effectiveAgeDays = (birdAgeDays ?: flock?.ageDays ?: 1).coerceAtLeast(1)
+            val todayJalali = dateJalaliStr ?: com.example.poultryapp.engine.JalaliDateHelper.getJalaliDate().toStandardString()
+            val log = com.example.poultryapp.data.local.BirdSlaughterLog(
+                flockId = flockId,
+                flockName = flockName,
+                birdCount = birdCount,
+                birdAgeDays = effectiveAgeDays,
+                liveWeightKg = liveWeightKg,
+                carcassWeightKg = carcassWeightKg,
+                dateJalaliStr = todayJalali,
+                timestampMillis = System.currentTimeMillis(),
+                notes = notes?.takeIf { it.isNotBlank() }
+            )
+            val id = birdExitRepo.insertBirdSlaughterLog(log)
+            if (id > 0L) {
+                com.example.poultryapp.widget.FarmStatusWidgetProvider.sendUpdateBroadcast(getApplication())
+            }
+            onComplete?.invoke(id > 0L)
+        }
+    }
+
+    fun deleteBirdSlaughter(id: Long) {
+        viewModelScope.launch {
+            if (birdExitRepo.deleteBirdSlaughterLog(id)) {
+                com.example.poultryapp.widget.FarmStatusWidgetProvider.sendUpdateBroadcast(getApplication())
+            }
         }
     }
 

@@ -247,8 +247,8 @@ fun HomeScreen(
             }
         }
 
-        // 2. Warehouse feed stock shortages (< 3 days)
-        val feedItems = warehouseItems.filter { it.category == WarehouseCategory.FEED }
+        // 2. Warehouse feed stock shortages (only for items with alerts enabled)
+        val feedItems = warehouseItems.filter { it.category == WarehouseCategory.FEED && it.minAlertThreshold > 0.0 }
         for (feedItem in feedItems) {
             val assignedFlocks = flocks.filter { it.id in feedItem.assignedFlockIds }
             val dailyFeedGrams = assignedFlocks.sumOf { flockRequirements[it.id]?.totalFeedGrams ?: 0.0 }
@@ -257,8 +257,10 @@ fun HomeScreen(
                 val daysRemaining = feedItem.currentStock / dailyFeedKg
                 if (daysRemaining <= 3.0) {
                     alerts.add("موجودی دان «${feedItem.name}» فقط برای ${toPersianDigits(String.format(Locale.US, "%.1f", daysRemaining))} روز کافی است")
+                } else if (feedItem.currentStock <= feedItem.minAlertThreshold) {
+                    alerts.add("موجودی خوراک «${feedItem.name}» کمتر از حد نصاب انبار است")
                 }
-            } else if (feedItem.minAlertThreshold > 0.0 && feedItem.currentStock <= feedItem.minAlertThreshold) {
+            } else if (feedItem.currentStock <= feedItem.minAlertThreshold) {
                 alerts.add("موجودی خوراک «${feedItem.name}» کمتر از حد نصاب انبار است")
             }
         }

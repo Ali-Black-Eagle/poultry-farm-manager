@@ -1,0 +1,169 @@
+{
+  "intents": {
+    "ADD_EGGS": {
+      "triggers": [
+        {"word": "egg", "weight": 0.5},
+        {"word": "eggs", "weight": 0.5},
+        {"word": "tray", "weight": 0.6},
+        {"word": "trays", "weight": 0.6},
+        {"word": "carton", "weight": 0.6},
+        {"word": "collected", "weight": 0.5},
+        {"word": "add", "weight": 0.4},
+        {"word": "log", "weight": 0.4}
+      ]
+    },
+    "ADD_TRANSACTION": {
+      "triggers": [
+        {"word": "expense", "weight": 0.5},
+        {"word": "spent", "weight": 0.5},
+        {"word": "bought", "weight": 0.5},
+        {"word": "cost", "weight": 0.4},
+        {"word": "paid", "weight": 0.4},
+        {"word": "income", "weight": 0.5},
+        {"word": "sold", "weight": 0.5}
+      ]
+    },
+    "ADD_FEED_WATER": {
+      "triggers": [
+        {"word": "feed", "weight": 0.5},
+        {"word": "water", "weight": 0.5},
+        {"word": "refill", "weight": 0.7},
+        {"word": "fed", "weight": 0.6}
+      ]
+    },
+    "QUERY_FEED_WATER": {
+      "triggers": [
+        {"word": "feed remaining", "weight": 0.7},
+        {"word": "water remaining", "weight": 0.7},
+        {"word": "consumption", "weight": 0.6}
+      ]
+    },
+    "LOG_MORTALITY": {
+      "triggers": [
+        {"word": "mortality", "weight": 0.7},
+        {"word": "dead birds", "weight": 0.7},
+        {"word": "died", "weight": 0.6}
+      ]
+    },
+    "SELL_BIRDS": {
+      "triggers": [
+        {"word": "sell birds", "weight": 0.85},
+        {"word": "sold birds", "weight": 0.85},
+        {"word": "sold chickens", "weight": 0.85}
+      ]
+    },
+    "SLAUGHTER_BIRDS": {
+      "triggers": [
+        {"word": "slaughter", "weight": 0.9},
+        {"word": "slaughtered", "weight": 0.9},
+        {"word": "butcher", "weight": 0.85},
+        {"word": "carcass", "weight": 0.6}
+      ]
+    },
+    "QUERY_MORTALITY": {
+      "triggers": [
+        {"word": "how many dead", "weight": 0.7},
+        {"word": "mortality rate", "weight": 0.7}
+      ]
+    },
+    "QUERY_FLOCKS": {
+      "triggers": [
+        {"word": "flock count", "weight": 0.7},
+        {"word": "bird count", "weight": 0.7},
+        {"word": "flock age", "weight": 0.7}
+      ]
+    },
+    "TRANSFER_BIRDS": {
+      "triggers": [
+        {"word": "transfer birds", "weight": 0.8},
+        {"word": "move birds", "weight": 0.7}
+      ]
+    },
+    "QUERY_WAREHOUSE": {
+      "triggers": [
+        {"word": "warehouse stock", "weight": 0.7},
+        {"word": "inventory", "weight": 0.7},
+        {"word": "low stock", "weight": 0.7}
+      ]
+    },
+    "CONSUME_WAREHOUSE": {
+      "triggers": [
+        {"word": "consume stock", "weight": 0.7},
+        {"word": "use feed", "weight": 0.6}
+      ]
+    },
+    "DIAGNOSE_DISEASE": {
+      "triggers": [
+        {"word": "diagnose", "weight": 0.8},
+        {"word": "disease", "weight": 0.7},
+        {"word": "symptoms", "weight": 0.7}
+      ]
+    },
+    "QUERY_MEDICATION": {
+      "triggers": [
+        {"word": "dosage", "weight": 0.8},
+        {"word": "withdrawal period", "weight": 0.8}
+      ]
+    },
+    "ADD_SCHEDULE": {
+      "triggers": [
+        {"word": "remind me", "weight": 0.8},
+        {"word": "schedule", "weight": 0.7}
+      ]
+    },
+    "QUERY_SCHEDULE": {
+      "triggers": [
+        {"word": "today schedule", "weight": 0.8},
+        {"word": "today tasks", "weight": 0.8}
+      ]
+    },
+    "QUERY_CONTACTS": {
+      "triggers": [
+        {"word": "phone number", "weight": 0.8},
+        {"word": "contact", "weight": 0.7}
+      ]
+    },
+    "QUERY_WEATHER": {
+      "triggers": [
+        {"word": "weather", "weight": 0.8},
+        {"word": "temperature", "weight": 0.8}
+      ]
+    },
+    "QUERY_EGGS": {
+      "triggers": [
+        {"word": "how many eggs", "weight": 0.6},
+        {"word": "eggs today", "weight": 0.5}
+      ]
+    },
+    "QUERY_FINANCE": {
+      "triggers": [
+        {"word": "how much did i spend", "weight": 0.6},
+        {"word": "profit this week", "weight": 0.6}
+      ]
+    },
+    "UNDO_LAST": {
+      "triggers": [
+        {"word": "undo", "weight": 0.8},
+        {"word": "revert", "weight": 0.7}
+      ]
+    },
+    "OPEN_SCREEN": {
+      "triggers": [
+        {"word": "open", "weight": 0.7},
+        {"word": "go to", "weight": 0.7}
+      ]
+    },
+    "HELP": {
+      "triggers": [
+        {"word": "help", "weight": 0.8},
+        {"word": "commands", "weight": 0.7}
+      ]
+    },
+    "GREETING": {
+      "triggers": [
+        {"word": "hi", "weight": 0.8},
+        {"word": "hello", "weight": 0.8}
+      ]
+    }
+  }
+}

@@ -210,8 +210,7 @@ enum class MortalityReason(val titleFa: String, val isTrueMortality: Boolean) {
     HEAT_COLD_STRESS("استرس دمایی / خفگی و قطعی فن", true),
     CANNIBALISM("کانیبالیسم و خودخوری", true),
     PREDATOR_ACCIDENT("شکارچی / حوادث فیزیکی سالن", true),
-    CULLING("حذف انتخابی / پرنده ضعیف", true),
-    LIVE_SALE("فروش پرنده زنده به عنوان محصول", false);
+    CULLING("حذف انتخابی / پرنده ضعیف", true);
 
     companion object {
         fun fromString(value: String?): MortalityReason {
@@ -232,6 +231,67 @@ data class FlockMortalityLog(
     val timestampMillis: Long = System.currentTimeMillis(),
     val notes: String? = null
 )
+
+data class BirdSaleLog(
+    val id: Long = 0L,
+    val flockId: Long,
+    val flockName: String,
+    val birdCount: Int,
+    val birdAgeDays: Int = 1,
+    val liveWeightKg: Double? = null,
+    val unitPriceTomans: Double? = null,
+    val totalRevenueTomans: Double = 0.0,
+    val buyerName: String? = null,
+    val linkedTransactionId: Long? = null,
+    val dateJalaliStr: String,
+    val timestampMillis: Long = System.currentTimeMillis(),
+    val notes: String? = null
+)
+
+data class BirdSlaughterLog(
+    val id: Long = 0L,
+    val flockId: Long,
+    val flockName: String,
+    val birdCount: Int,
+    val birdAgeDays: Int,
+    val liveWeightKg: Double? = null,
+    val carcassWeightKg: Double? = null,
+    val dateJalaliStr: String,
+    val timestampMillis: Long = System.currentTimeMillis(),
+    val notes: String? = null
+) {
+    val carcassYieldPercent: Double?
+        get() = FlockExitAnalytics.calculateCarcassYieldPercent(liveWeightKg, carcassWeightKg)
+}
+
+object FlockExitAnalytics {
+    fun filterBiologicalMortality(logs: List<FlockMortalityLog>): List<FlockMortalityLog> {
+        return logs.filter { it.reason.isTrueMortality }
+    }
+
+    fun calculateCumulativeMortalityRatePercent(
+        currentLiveBirds: Int,
+        mortalityLogs: List<FlockMortalityLog>,
+        birdSales: List<BirdSaleLog>,
+        birdSlaughters: List<BirdSlaughterLog>
+    ): Double {
+        val bioMortality = filterBiologicalMortality(mortalityLogs).sumOf { it.count.coerceAtLeast(0) }
+        val soldCount = birdSales.sumOf { it.birdCount.coerceAtLeast(0) }
+        val slaughteredCount = birdSlaughters.sumOf { it.birdCount.coerceAtLeast(0) }
+        val totalPlacedDenominator = currentLiveBirds.coerceAtLeast(0) + bioMortality + soldCount + slaughteredCount
+        return if (totalPlacedDenominator > 0) {
+            (bioMortality.toDouble() / totalPlacedDenominator.toDouble()) * 100.0
+        } else {
+            0.0
+        }
+    }
+
+    fun calculateCarcassYieldPercent(liveWeightKg: Double?, carcassWeightKg: Double?): Double? {
+        if (liveWeightKg == null || carcassWeightKg == null) return null
+        if (liveWeightKg <= 0.0 || carcassWeightKg <= 0.0) return null
+        return ((carcassWeightKg / liveWeightKg) * 100.0).coerceIn(0.0, 100.0)
+    }
+}
 
 enum class ContactCategory(val titleFa: String) {
     SLAUGHTERHOUSE("کشتارگاه و خریدار زنده"),
@@ -384,6 +444,7 @@ data class AppSettings(
     val manualTempCelsius: Double? = null,
     val isWorkerModeEnabled: Boolean = false,
     val managerPinHash: String = "",
+    val managerPinSalt: String = "",
     val managerRecoveryKey: String = "",
     val recoveryKey: String = managerRecoveryKey,
     val isBiometricEnabled: Boolean = true,
@@ -549,7 +610,7 @@ data class FeasibilityResult(
     val totalFeedKg: Double,
     val totalRevenueTomans: Double,
     val netProfitTomans: Double,
-    val breakEvenDay: Int,
+    val breakEvenDay: Int? = null,
     val roiPercent: Double,
     val profitPerBirdTomans: Double
 )

@@ -1,0 +1,73 @@
+[
+  {
+    "text": "add 95 eggs today",
+    "expectedIntent": "ADD_EGGS",
+    "expectedSlots": {
+      "COUNT": 95
+    }
+  },
+  {
+    "text": "add expense 500 for feed",
+    "expectedIntent": "ADD_TRANSACTION",
+    "expectedSlots": {
+      "AMOUNT": 500.0
+    }
+  },
+  {
+    "text": "refill 200 liters water",
+    "expectedIntent": "ADD_FEED_WATER",
+    "expectedSlots": {
+      "COUNT": 200
+    }
+  },
+  {
+    "text": "log 3 dead birds in flock",
+    "expectedIntent": "LOG_MORTALITY",
+    "expectedSlots": {
+      "COUNT": 3
+    }
+  },
+  {
+    "text": "sold 40 birds for 500",
+    "expectedIntent": "SELL_BIRDS",
+    "expectedSlots": {
+      "COUNT": 40,
+      "AMOUNT": 500.0
+    }
+  },
+  {
+    "text": "slaughter 60 birds live weight 150 kg carcass 110 kg",
+    "expectedIntent": "SLAUGHTER_BIRDS",
+    "expectedSlots": {
+      "COUNT": 60
+    }
+  },
+  {
+    "text": "warehouse stock",
+    "expectedIntent": "QUERY_WAREHOUSE"
+  },
+  {
+    "text": "dosage for oxytetracycline",
+    "expectedIntent": "QUERY_MEDICATION"
+  },
+  {
+    "text": "phone number of vet",
+    "expectedIntent": "QUERY_CONTACTS"
+  },
+  {
+    "text": "farm temperature",
+    "expectedIntent": "QUERY_WEATHER"
+  },
+  {
+    "text": "undo that",
+    "expectedIntent": "UNDO_LAST"
+  },
+  {
+    "text": "help",
+    "expectedIntent": "HELP"
+  },
+  {
+    "text": "hello",
+    "expectedIntent": "GREETING"
+  }
+]

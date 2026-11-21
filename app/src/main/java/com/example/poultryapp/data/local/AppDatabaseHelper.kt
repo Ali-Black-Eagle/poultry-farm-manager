@@ -17,7 +17,7 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
 
     companion object {
         const val DATABASE_NAME = "poultry_farm.db"
-        const val DATABASE_VERSION = 12
+        const val DATABASE_VERSION = 13
 
         @Volatile
         private var instance: AppDatabaseHelper? = null
@@ -158,6 +158,41 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                 count INTEGER NOT NULL,
                 reason TEXT NOT NULL,
                 diagnosis_hint TEXT,
+                date_jalali_str TEXT NOT NULL,
+                timestamp_millis INTEGER NOT NULL,
+                notes TEXT,
+                FOREIGN KEY(flock_id) REFERENCES flocks(id) ON DELETE CASCADE
+            );
+        """.trimIndent())
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS flock_bird_sales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                flock_id INTEGER NOT NULL,
+                flock_name TEXT NOT NULL,
+                bird_count INTEGER NOT NULL,
+                bird_age_days INTEGER NOT NULL DEFAULT 1,
+                live_weight_kg REAL,
+                unit_price_tomans REAL,
+                total_revenue_tomans REAL NOT NULL DEFAULT 0.0,
+                buyer_name TEXT,
+                linked_transaction_id INTEGER,
+                date_jalali_str TEXT NOT NULL,
+                timestamp_millis INTEGER NOT NULL,
+                notes TEXT,
+                FOREIGN KEY(flock_id) REFERENCES flocks(id) ON DELETE CASCADE
+            );
+        """.trimIndent())
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS flock_bird_slaughters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                flock_id INTEGER NOT NULL,
+                flock_name TEXT NOT NULL,
+                bird_count INTEGER NOT NULL,
+                bird_age_days INTEGER NOT NULL DEFAULT 1,
+                live_weight_kg REAL,
+                carcass_weight_kg REAL,
                 date_jalali_str TEXT NOT NULL,
                 timestamp_millis INTEGER NOT NULL,
                 notes TEXT,
@@ -506,6 +541,76 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                 e.printStackTrace()
             }
         }
+        if (oldVersion < 13) {
+            try {
+                ensureBirdExitTablesAndMigrateLegacySales(db)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun ensureBirdExitTablesAndMigrateLegacySales(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS flock_bird_sales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                flock_id INTEGER NOT NULL,
+                flock_name TEXT NOT NULL,
+                bird_count INTEGER NOT NULL,
+                bird_age_days INTEGER NOT NULL DEFAULT 1,
+                live_weight_kg REAL,
+                unit_price_tomans REAL,
+                total_revenue_tomans REAL NOT NULL DEFAULT 0.0,
+                buyer_name TEXT,
+                linked_transaction_id INTEGER,
+                date_jalali_str TEXT NOT NULL,
+                timestamp_millis INTEGER NOT NULL,
+                notes TEXT,
+                FOREIGN KEY(flock_id) REFERENCES flocks(id) ON DELETE CASCADE
+            );
+        """.trimIndent())
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS flock_bird_slaughters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                flock_id INTEGER NOT NULL,
+                flock_name TEXT NOT NULL,
+                bird_count INTEGER NOT NULL,
+                bird_age_days INTEGER NOT NULL DEFAULT 1,
+                live_weight_kg REAL,
+                carcass_weight_kg REAL,
+                date_jalali_str TEXT NOT NULL,
+                timestamp_millis INTEGER NOT NULL,
+                notes TEXT,
+                FOREIGN KEY(flock_id) REFERENCES flocks(id) ON DELETE CASCADE
+            );
+        """.trimIndent())
+
+        // Migrate any historical LIVE_SALE entries out of flock_mortality_logs without re-deducting birdCount
+        val legacyCount = try {
+            db.compileStatement("SELECT COUNT(*) FROM flock_mortality_logs WHERE reason = 'LIVE_SALE'").simpleQueryForLong()
+        } catch (_: Exception) {
+            0L
+        }
+        if (legacyCount > 0L) {
+            db.execSQL("""
+                INSERT INTO flock_bird_sales (
+                    flock_id, flock_name, bird_count, bird_age_days, total_revenue_tomans, date_jalali_str, timestamp_millis, notes
+                )
+                SELECT
+                    m.flock_id,
+                    m.flock_name,
+                    m.count,
+                    COALESCE((SELECT MAX(1, CAST(((m.timestamp_millis - f.birth_epoch_millis) / 86400000) AS INTEGER) + 1) FROM flocks f WHERE f.id = m.flock_id), 1),
+                    0.0,
+                    m.date_jalali_str,
+                    m.timestamp_millis,
+                    COALESCE(NULLIF(TRIM(m.notes), ''), NULLIF(TRIM(m.diagnosis_hint), ''), 'منتقل‌شده از سوابق قدیمی فروش زنده')
+                FROM flock_mortality_logs m
+                WHERE m.reason = 'LIVE_SALE';
+            """.trimIndent())
+            db.execSQL("DELETE FROM flock_mortality_logs WHERE reason = 'LIVE_SALE';")
+        }
     }
 
     override fun onOpen(db: SQLiteDatabase) {
@@ -704,6 +809,7 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                     FOREIGN KEY(flock_id) REFERENCES flocks(id) ON DELETE CASCADE
                 );
             """.trimIndent())
+            ensureBirdExitTablesAndMigrateLegacySales(db)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -846,6 +952,8 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
             db.delete("feed_water_charges", "flock_id = ?", fIdStr)
             db.delete("calendar_schedules", "flock_id = ?", fIdStr)
             db.delete("flock_mortality_logs", "flock_id = ?", fIdStr)
+            db.delete("flock_bird_sales", "flock_id = ?", fIdStr)
+            db.delete("flock_bird_slaughters", "flock_id = ?", fIdStr)
             db.delete("flock_observations", "flock_id = ?", fIdStr)
             db.delete("egg_productions", "flock_id = ?", fIdStr)
             db.delete("bird_transfers", "from_flock_id = ? OR to_flock_id = ?", arrayOf(flockId.toString(), flockId.toString()))
@@ -1434,46 +1542,17 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         }
         val id = db.insert("egg_productions", null, cv)
 
-        // Automatically update warehouse inventory for fertile and table eggs
-        val allWarehouse = getAllWarehouseItems()
-        if (production.fertileCount > 0) {
-            val fertileItem = allWarehouse.find { it.category == WarehouseCategory.EGG && it.name.contains("نطفه‌دار") }
-            if (fertileItem != null) {
-                updateWarehouseItem(fertileItem.copy(currentStock = fertileItem.currentStock + production.fertileCount.toDouble()))
-            } else {
-                insertWarehouseItem(
-                    WarehouseItem(
-                        name = "تخم‌مرغ نطفه‌دار",
-                        category = WarehouseCategory.EGG,
-                        currentStock = production.fertileCount.toDouble(),
-                        unit = "عدد",
-                        pricePerUnit = 55000.0,
-                        minAlertThreshold = 30.0,
-                        isForSale = true,
-                        notes = "ایجاد خودکار پس از ثبت تخم‌مرغ نطفه‌دار"
-                    )
-                )
-            }
-        }
-        val tableCount = if (production.tableEggCount > 0) production.tableEggCount else (if (production.fertileCount == 0) production.healthyCount else 0)
-        if (tableCount > 0) {
-            val tableItem = allWarehouse.find { it.category == WarehouseCategory.EGG && (it.name.contains("خوراکی") || !it.name.contains("نطفه‌دار")) }
-            if (tableItem != null) {
-                updateWarehouseItem(tableItem.copy(currentStock = tableItem.currentStock + tableCount.toDouble()))
-            } else {
-                insertWarehouseItem(
-                    WarehouseItem(
-                        name = "تخم‌مرغ خوراکی",
-                        category = WarehouseCategory.EGG,
-                        currentStock = tableCount.toDouble(),
-                        unit = "عدد",
-                        pricePerUnit = 27000.0,
-                        minAlertThreshold = 100.0,
-                        isForSale = true,
-                        notes = "ایجاد خودکار پس از ثبت تخم‌مرغ خوراکی"
-                    )
-                )
-            }
+        // Automatically update warehouse inventory for fertile and table eggs if enabled in settings
+        val isAutoAdd = getSetting("is_auto_add_eggs_warehouse", "true").toBoolean()
+        if (isAutoAdd && id > 0) {
+            val tableCount = if (production.tableEggCount > 0) production.tableEggCount else (if (production.fertileCount == 0) production.healthyCount else 0)
+            autoAddProducedEggsToWarehouse(
+                flockId = production.flockId,
+                flockName = production.flockName,
+                fertileCount = production.fertileCount,
+                tableCount = tableCount,
+                dateJalaliStr = production.dateJalaliStr
+            )
         }
 
         notifyDataChanged()
@@ -1647,6 +1726,345 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         return rows > 0
     }
 
+    // ==================== BIRD SALE & SLAUGHTER LOGS ====================
+
+    private fun getFlockByIdWithDb(db: SQLiteDatabase, id: Long): Flock? {
+        val cursor = db.rawQuery("SELECT * FROM flocks WHERE id = ?", arrayOf(id.toString()))
+        cursor.use {
+            if (it.moveToFirst()) {
+                val createdAt = it.getLong(it.getColumnIndexOrThrow("created_at_millis"))
+                val birthEpoch = it.getLong(it.getColumnIndexOrThrow("birth_epoch_millis"))
+                val sgIdx = it.getColumnIndex("subgroups_json")
+                val subGroups = if (sgIdx != -1 && !it.isNull(sgIdx)) parseSubGroups(it.getString(sgIdx), createdAt, birthEpoch) else emptyList()
+                val feedEnIdx = it.getColumnIndex("is_feed_enabled")
+                val isFeedEnabled = if (feedEnIdx != -1 && !it.isNull(feedEnIdx)) it.getInt(feedEnIdx) == 1 else true
+                val waterEnIdx = it.getColumnIndex("is_water_enabled")
+                val isWaterEnabled = if (waterEnIdx != -1 && !it.isNull(waterEnIdx)) it.getInt(waterEnIdx) == 1 else true
+                val tempIdx = it.getColumnIndex("custom_temp_celsius")
+                val customTempCelsius = if (tempIdx != -1 && !it.isNull(tempIdx)) it.getDouble(tempIdx) else null
+                val medEndIdx = it.getColumnIndex("medication_withdrawal_end_millis")
+                val medEndMillis = if (medEndIdx != -1 && !it.isNull(medEndIdx)) it.getLong(medEndIdx) else null
+                val medNameIdx = it.getColumnIndex("active_medication_name")
+                val medName = if (medNameIdx != -1 && !it.isNull(medNameIdx)) it.getString(medNameIdx) else null
+
+                return Flock(
+                    id = it.getLong(it.getColumnIndexOrThrow("id")),
+                    name = it.getString(it.getColumnIndexOrThrow("name")),
+                    species = BirdSpecies.fromString(it.getString(it.getColumnIndexOrThrow("species"))),
+                    breed = it.getString(it.getColumnIndexOrThrow("breed")),
+                    birthEpochMillis = birthEpoch,
+                    birdCount = it.getInt(it.getColumnIndexOrThrow("bird_count")),
+                    photoUri = it.getString(it.getColumnIndexOrThrow("photo_uri")),
+                    notes = it.getString(it.getColumnIndexOrThrow("notes")),
+                    createdAtMillis = createdAt,
+                    subGroups = subGroups,
+                    isFeedEnabled = isFeedEnabled,
+                    isWaterEnabled = isWaterEnabled,
+                    customTempCelsius = customTempCelsius,
+                    medicationWithdrawalEndMillis = medEndMillis,
+                    activeMedicationName = medName
+                )
+            }
+        }
+        return null
+    }
+
+    private fun adjustFlockBirdCountInTx(db: SQLiteDatabase, flockId: Long, deltaCount: Int): Boolean {
+        val flock = getFlockByIdWithDb(db, flockId) ?: return false
+        if (deltaCount == 0) return true
+
+        val updatedSubGroups: List<FlockSubGroup>
+        val newBirdCount: Int
+
+        if (deltaCount < 0) {
+            val deductCount = -deltaCount
+            if (flock.effectiveBirdCount < deductCount) return false
+            if (flock.subGroups.isNotEmpty()) {
+                var remaining = deductCount
+                val newSubList = flock.subGroups.toMutableList()
+                val sortedIndices = newSubList.indices.sortedByDescending { newSubList[it].birdCount }
+                for (idx in sortedIndices) {
+                    if (remaining <= 0) break
+                    val currentCount = newSubList[idx].birdCount
+                    val dec = currentCount.coerceAtMost(remaining)
+                    newSubList[idx] = newSubList[idx].copy(birdCount = (currentCount - dec).coerceAtLeast(0))
+                    remaining -= dec
+                }
+                updatedSubGroups = newSubList
+                newBirdCount = updatedSubGroups.sumOf { it.birdCount }
+            } else {
+                updatedSubGroups = emptyList()
+                newBirdCount = (flock.birdCount - deductCount).coerceAtLeast(0)
+            }
+        } else {
+            if (flock.subGroups.isNotEmpty()) {
+                val newSubList = flock.subGroups.toMutableList()
+                val targetIdx = newSubList.indices.maxByOrNull { newSubList[it].birdCount } ?: 0
+                newSubList[targetIdx] = newSubList[targetIdx].copy(
+                    birdCount = newSubList[targetIdx].birdCount + deltaCount
+                )
+                updatedSubGroups = newSubList
+                newBirdCount = updatedSubGroups.sumOf { it.birdCount }
+            } else {
+                updatedSubGroups = emptyList()
+                newBirdCount = flock.birdCount + deltaCount
+            }
+        }
+
+        val cv = ContentValues().apply {
+            put("bird_count", newBirdCount)
+            put("subgroups_json", serializeSubGroups(updatedSubGroups))
+        }
+        return db.update("flocks", cv, "id = ?", arrayOf(flockId.toString())) > 0
+    }
+
+    fun insertBirdSaleLog(log: BirdSaleLog, createFinanceTransaction: Boolean = true): Long {
+        if (log.birdCount <= 0) return -1L
+        val db = writableDatabase
+        db.beginTransaction()
+        var saleId = -1L
+        try {
+            val flock = getFlockByIdWithDb(db, log.flockId) ?: return -1L
+            if (flock.effectiveBirdCount < log.birdCount) return -1L
+            if (!adjustFlockBirdCountInTx(db, log.flockId, -log.birdCount)) return -1L
+
+            var txId: Long? = log.linkedTransactionId
+            if (createFinanceTransaction && log.totalRevenueTomans > 0.0 && txId == null) {
+                val txTitle = buildString {
+                    append("فروش ${com.example.poultryapp.engine.toPersianDigits(log.birdCount)} قطعه از ${log.flockName}")
+                    if (!log.buyerName.isNullOrBlank()) {
+                        append(" به ${log.buyerName}")
+                    }
+                }
+                val liveW = log.liveWeightKg
+                val qty = if (liveW != null && liveW > 0.0) liveW else log.birdCount.toDouble()
+                val unit = if (liveW != null && liveW > 0.0) "کیلوگرم" else "قطعه"
+                val unitPrice = log.unitPriceTomans ?: if (qty > 0.0) log.totalRevenueTomans / qty else 0.0
+                val txCv = ContentValues().apply {
+                    put("title", txTitle)
+                    put("amount_tomans", log.totalRevenueTomans)
+                    put("type", TransactionType.INCOME.name)
+                    put("category", TransactionCategory.BIRD_SALE.name)
+                    put("date_jalali_str", log.dateJalaliStr)
+                    put("timestamp_millis", log.timestampMillis)
+                    put("related_flock_id", log.flockId)
+                    put("related_flock_name", log.flockName)
+                    put("quantity", qty)
+                    put("unit", unit)
+                    put("unit_price_tomans", unitPrice)
+                    put("notes", log.notes)
+                }
+                val insertedTxId = db.insert("financial_transactions", null, txCv)
+                if (insertedTxId > 0L) txId = insertedTxId
+            }
+
+            val cv = ContentValues().apply {
+                put("flock_id", log.flockId)
+                put("flock_name", log.flockName)
+                put("bird_count", log.birdCount)
+                put("bird_age_days", log.birdAgeDays.coerceAtLeast(1))
+                if (log.liveWeightKg != null) put("live_weight_kg", log.liveWeightKg) else putNull("live_weight_kg")
+                if (log.unitPriceTomans != null) put("unit_price_tomans", log.unitPriceTomans) else putNull("unit_price_tomans")
+                put("total_revenue_tomans", log.totalRevenueTomans.coerceAtLeast(0.0))
+                if (!log.buyerName.isNullOrBlank()) put("buyer_name", log.buyerName) else putNull("buyer_name")
+                if (txId != null && txId > 0L) put("linked_transaction_id", txId) else putNull("linked_transaction_id")
+                put("date_jalali_str", log.dateJalaliStr)
+                put("timestamp_millis", log.timestampMillis)
+                if (!log.notes.isNullOrBlank()) put("notes", log.notes) else putNull("notes")
+            }
+            saleId = db.insert("flock_bird_sales", null, cv)
+            if (saleId > 0L) {
+                db.setTransactionSuccessful()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            saleId = -1L
+        } finally {
+            db.endTransaction()
+        }
+        if (saleId > 0L) notifyDataChanged()
+        return saleId
+    }
+
+    private fun readBirdSaleLogFromCursor(c: android.database.Cursor): BirdSaleLog {
+        val lwIdx = c.getColumnIndex("live_weight_kg")
+        val upIdx = c.getColumnIndex("unit_price_tomans")
+        val bnIdx = c.getColumnIndex("buyer_name")
+        val ltIdx = c.getColumnIndex("linked_transaction_id")
+        val notesIdx = c.getColumnIndex("notes")
+        return BirdSaleLog(
+            id = c.getLong(c.getColumnIndexOrThrow("id")),
+            flockId = c.getLong(c.getColumnIndexOrThrow("flock_id")),
+            flockName = c.getString(c.getColumnIndexOrThrow("flock_name")),
+            birdCount = c.getInt(c.getColumnIndexOrThrow("bird_count")),
+            birdAgeDays = c.getInt(c.getColumnIndexOrThrow("bird_age_days")),
+            liveWeightKg = if (lwIdx != -1 && !c.isNull(lwIdx)) c.getDouble(lwIdx) else null,
+            unitPriceTomans = if (upIdx != -1 && !c.isNull(upIdx)) c.getDouble(upIdx) else null,
+            totalRevenueTomans = c.getDouble(c.getColumnIndexOrThrow("total_revenue_tomans")),
+            buyerName = if (bnIdx != -1 && !c.isNull(bnIdx)) c.getString(bnIdx) else null,
+            linkedTransactionId = if (ltIdx != -1 && !c.isNull(ltIdx)) c.getLong(ltIdx) else null,
+            dateJalaliStr = c.getString(c.getColumnIndexOrThrow("date_jalali_str")),
+            timestampMillis = c.getLong(c.getColumnIndexOrThrow("timestamp_millis")),
+            notes = if (notesIdx != -1 && !c.isNull(notesIdx)) c.getString(notesIdx) else null
+        )
+    }
+
+    private fun getBirdSaleLogByIdWithDb(db: SQLiteDatabase, id: Long): BirdSaleLog? {
+        val cursor = db.rawQuery("SELECT * FROM flock_bird_sales WHERE id = ? LIMIT 1", arrayOf(id.toString()))
+        cursor.use {
+            if (it.moveToFirst()) return readBirdSaleLogFromCursor(it)
+        }
+        return null
+    }
+
+    fun getBirdSaleLogById(id: Long): BirdSaleLog? = getBirdSaleLogByIdWithDb(readableDatabase, id)
+
+    fun getAllBirdSaleLogs(): List<BirdSaleLog> {
+        val db = readableDatabase
+        val list = mutableListOf<BirdSaleLog>()
+        try {
+            val cursor = db.rawQuery("SELECT * FROM flock_bird_sales ORDER BY timestamp_millis DESC, id DESC", null)
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(readBirdSaleLogFromCursor(it))
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    fun deleteBirdSaleLog(id: Long): Boolean {
+        val db = writableDatabase
+        db.beginTransaction()
+        var deleted = false
+        try {
+            val log = getBirdSaleLogByIdWithDb(db, id) ?: return false
+            val rows = db.delete("flock_bird_sales", "id = ?", arrayOf(id.toString()))
+            if (rows > 0) {
+                if (log.birdCount > 0) {
+                    adjustFlockBirdCountInTx(db, log.flockId, log.birdCount)
+                }
+                if (log.linkedTransactionId != null && log.linkedTransactionId > 0L) {
+                    db.delete("financial_transactions", "id = ?", arrayOf(log.linkedTransactionId.toString()))
+                }
+                db.setTransactionSuccessful()
+                deleted = true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            deleted = false
+        } finally {
+            db.endTransaction()
+        }
+        if (deleted) notifyDataChanged()
+        return deleted
+    }
+
+    fun insertBirdSlaughterLog(log: BirdSlaughterLog): Long {
+        if (log.birdCount <= 0) return -1L
+        val db = writableDatabase
+        db.beginTransaction()
+        var slaughterId = -1L
+        try {
+            val flock = getFlockByIdWithDb(db, log.flockId) ?: return -1L
+            if (flock.effectiveBirdCount < log.birdCount) return -1L
+            if (!adjustFlockBirdCountInTx(db, log.flockId, -log.birdCount)) return -1L
+
+            val cv = ContentValues().apply {
+                put("flock_id", log.flockId)
+                put("flock_name", log.flockName)
+                put("bird_count", log.birdCount)
+                put("bird_age_days", log.birdAgeDays.coerceAtLeast(1))
+                if (log.liveWeightKg != null) put("live_weight_kg", log.liveWeightKg) else putNull("live_weight_kg")
+                if (log.carcassWeightKg != null) put("carcass_weight_kg", log.carcassWeightKg) else putNull("carcass_weight_kg")
+                put("date_jalali_str", log.dateJalaliStr)
+                put("timestamp_millis", log.timestampMillis)
+                if (!log.notes.isNullOrBlank()) put("notes", log.notes) else putNull("notes")
+            }
+            slaughterId = db.insert("flock_bird_slaughters", null, cv)
+            if (slaughterId > 0L) {
+                db.setTransactionSuccessful()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            slaughterId = -1L
+        } finally {
+            db.endTransaction()
+        }
+        if (slaughterId > 0L) notifyDataChanged()
+        return slaughterId
+    }
+
+    private fun readBirdSlaughterLogFromCursor(c: android.database.Cursor): BirdSlaughterLog {
+        val lwIdx = c.getColumnIndex("live_weight_kg")
+        val cwIdx = c.getColumnIndex("carcass_weight_kg")
+        val notesIdx = c.getColumnIndex("notes")
+        return BirdSlaughterLog(
+            id = c.getLong(c.getColumnIndexOrThrow("id")),
+            flockId = c.getLong(c.getColumnIndexOrThrow("flock_id")),
+            flockName = c.getString(c.getColumnIndexOrThrow("flock_name")),
+            birdCount = c.getInt(c.getColumnIndexOrThrow("bird_count")),
+            birdAgeDays = c.getInt(c.getColumnIndexOrThrow("bird_age_days")),
+            liveWeightKg = if (lwIdx != -1 && !c.isNull(lwIdx)) c.getDouble(lwIdx) else null,
+            carcassWeightKg = if (cwIdx != -1 && !c.isNull(cwIdx)) c.getDouble(cwIdx) else null,
+            dateJalaliStr = c.getString(c.getColumnIndexOrThrow("date_jalali_str")),
+            timestampMillis = c.getLong(c.getColumnIndexOrThrow("timestamp_millis")),
+            notes = if (notesIdx != -1 && !c.isNull(notesIdx)) c.getString(notesIdx) else null
+        )
+    }
+
+    private fun getBirdSlaughterLogByIdWithDb(db: SQLiteDatabase, id: Long): BirdSlaughterLog? {
+        val cursor = db.rawQuery("SELECT * FROM flock_bird_slaughters WHERE id = ? LIMIT 1", arrayOf(id.toString()))
+        cursor.use {
+            if (it.moveToFirst()) return readBirdSlaughterLogFromCursor(it)
+        }
+        return null
+    }
+
+    fun getBirdSlaughterLogById(id: Long): BirdSlaughterLog? = getBirdSlaughterLogByIdWithDb(readableDatabase, id)
+
+    fun getAllBirdSlaughterLogs(): List<BirdSlaughterLog> {
+        val db = readableDatabase
+        val list = mutableListOf<BirdSlaughterLog>()
+        try {
+            val cursor = db.rawQuery("SELECT * FROM flock_bird_slaughters ORDER BY timestamp_millis DESC, id DESC", null)
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(readBirdSlaughterLogFromCursor(it))
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    fun deleteBirdSlaughterLog(id: Long): Boolean {
+        val db = writableDatabase
+        db.beginTransaction()
+        var deleted = false
+        try {
+            val log = getBirdSlaughterLogByIdWithDb(db, id) ?: return false
+            val rows = db.delete("flock_bird_slaughters", "id = ?", arrayOf(id.toString()))
+            if (rows > 0) {
+                if (log.birdCount > 0) {
+                    adjustFlockBirdCountInTx(db, log.flockId, log.birdCount)
+                }
+                db.setTransactionSuccessful()
+                deleted = true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            deleted = false
+        } finally {
+            db.endTransaction()
+        }
+        if (deleted) notifyDataChanged()
+        return deleted
+    }
+
     // ==================== FARM COMMERCIAL CONTACTS ====================
 
     fun insertContact(contact: FarmContact): Long {
@@ -1796,8 +2214,20 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
 
     fun deleteFinancialTransaction(id: Long): Boolean {
         val db = writableDatabase
-        val rows = db.delete("financial_transactions", "id = ?", arrayOf(id.toString()))
-        notifyDataChanged()
+        db.beginTransaction()
+        val rows = try {
+            val clearCv = ContentValues().apply { putNull("linked_transaction_id") }
+            db.update("flock_bird_sales", clearCv, "linked_transaction_id = ?", arrayOf(id.toString()))
+            val deleted = db.delete("financial_transactions", "id = ?", arrayOf(id.toString()))
+            db.setTransactionSuccessful()
+            deleted
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        } finally {
+            db.endTransaction()
+        }
+        if (rows > 0) notifyDataChanged()
         return rows > 0
     }
 
@@ -2534,6 +2964,61 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
         }
         root.put("biosecurityChecks", bioArr)
 
+        // 16. Flock Bird Sales
+        val salesArr = JSONArray()
+        val salesCursor = db.rawQuery("SELECT * FROM flock_bird_sales ORDER BY id ASC", null)
+        salesCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getLong(it.getColumnIndexOrThrow("id")))
+                    put("flockId", it.getLong(it.getColumnIndexOrThrow("flock_id")))
+                    put("flockName", it.getString(it.getColumnIndexOrThrow("flock_name")))
+                    put("birdCount", it.getInt(it.getColumnIndexOrThrow("bird_count")))
+                    put("birdAgeDays", it.getInt(it.getColumnIndexOrThrow("bird_age_days")))
+                    val lwIdx = it.getColumnIndex("live_weight_kg")
+                    if (lwIdx != -1 && !it.isNull(lwIdx)) put("liveWeightKg", it.getDouble(lwIdx))
+                    val upIdx = it.getColumnIndex("unit_price_tomans")
+                    if (upIdx != -1 && !it.isNull(upIdx)) put("unitPriceTomans", it.getDouble(upIdx))
+                    put("totalRevenueTomans", it.getDouble(it.getColumnIndexOrThrow("total_revenue_tomans")))
+                    val bnIdx = it.getColumnIndex("buyer_name")
+                    if (bnIdx != -1 && !it.isNull(bnIdx)) put("buyerName", it.getString(bnIdx))
+                    val ltIdx = it.getColumnIndex("linked_transaction_id")
+                    if (ltIdx != -1 && !it.isNull(ltIdx)) put("linkedTransactionId", it.getLong(ltIdx))
+                    put("dateJalaliStr", it.getString(it.getColumnIndexOrThrow("date_jalali_str")))
+                    put("timestampMillis", it.getLong(it.getColumnIndexOrThrow("timestamp_millis")))
+                    val nIdx = it.getColumnIndex("notes")
+                    if (nIdx != -1 && !it.isNull(nIdx)) put("notes", it.getString(nIdx))
+                }
+                salesArr.put(o)
+            }
+        }
+        root.put("flockBirdSales", salesArr)
+
+        // 17. Flock Bird Slaughters
+        val slaughterArr = JSONArray()
+        val slaughterCursor = db.rawQuery("SELECT * FROM flock_bird_slaughters ORDER BY id ASC", null)
+        slaughterCursor.use {
+            while (it.moveToNext()) {
+                val o = JSONObject().apply {
+                    put("id", it.getLong(it.getColumnIndexOrThrow("id")))
+                    put("flockId", it.getLong(it.getColumnIndexOrThrow("flock_id")))
+                    put("flockName", it.getString(it.getColumnIndexOrThrow("flock_name")))
+                    put("birdCount", it.getInt(it.getColumnIndexOrThrow("bird_count")))
+                    put("birdAgeDays", it.getInt(it.getColumnIndexOrThrow("bird_age_days")))
+                    val lwIdx = it.getColumnIndex("live_weight_kg")
+                    if (lwIdx != -1 && !it.isNull(lwIdx)) put("liveWeightKg", it.getDouble(lwIdx))
+                    val cwIdx = it.getColumnIndex("carcass_weight_kg")
+                    if (cwIdx != -1 && !it.isNull(cwIdx)) put("carcassWeightKg", it.getDouble(cwIdx))
+                    put("dateJalaliStr", it.getString(it.getColumnIndexOrThrow("date_jalali_str")))
+                    put("timestampMillis", it.getLong(it.getColumnIndexOrThrow("timestamp_millis")))
+                    val nIdx = it.getColumnIndex("notes")
+                    if (nIdx != -1 && !it.isNull(nIdx)) put("notes", it.getString(nIdx))
+                }
+                slaughterArr.put(o)
+            }
+        }
+        root.put("flockBirdSlaughters", slaughterArr)
+
         return root.toString(2)
     }
 
@@ -2687,26 +3172,109 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                     }
                 }
 
-                // 6. Mortality Logs - aggregate without duplicates
+                // 6. Mortality Logs - aggregate without duplicates (route legacy LIVE_SALE to flock_bird_sales)
                 if (root.has("flockMortalityLogs")) {
                     val arr = root.getJSONArray("flockMortalityLogs")
                     for (i in 0 until arr.length()) {
                         val o = arr.getJSONObject(i)
                         val ts = o.getLong("timestampMillis")
                         val fId = o.getLong("flockId")
-                        val exists = db.compileStatement("SELECT COUNT(*) FROM flock_mortality_logs WHERE flock_id = $fId AND timestamp_millis = $ts").simpleQueryForLong() > 0
+                        val reasonStr = o.optString("reason", "DISEASE")
+                        if (reasonStr.equals("LIVE_SALE", ignoreCase = true)) {
+                            val saleExists = db.rawQuery(
+                                "SELECT COUNT(*) FROM flock_bird_sales WHERE flock_id = ? AND timestamp_millis = ?",
+                                arrayOf(fId.toString(), ts.toString())
+                            ).use { c -> c.moveToFirst() && c.getLong(0) > 0L }
+                            if (!saleExists) {
+                                val cv = ContentValues().apply {
+                                    put("flock_id", fId)
+                                    put("flock_name", o.getString("flockName"))
+                                    put("bird_count", o.getInt("count"))
+                                    put("bird_age_days", 1)
+                                    put("total_revenue_tomans", 0.0)
+                                    put("date_jalali_str", o.getString("dateJalaliStr"))
+                                    put("timestamp_millis", ts)
+                                    val noteText = o.optString("notes", "").ifBlank {
+                                        o.optString("diagnosisHint", "").ifBlank { "منتقل‌شده از بکاپ فروش زنده" }
+                                    }
+                                    put("notes", noteText)
+                                }
+                                db.insert("flock_bird_sales", null, cv)
+                            }
+                        } else {
+                            val exists = db.compileStatement("SELECT COUNT(*) FROM flock_mortality_logs WHERE flock_id = $fId AND timestamp_millis = $ts").simpleQueryForLong() > 0
+                            if (!exists) {
+                                val cv = ContentValues().apply {
+                                    put("flock_id", fId)
+                                    put("flock_name", o.getString("flockName"))
+                                    put("count", o.getInt("count"))
+                                    put("reason", reasonStr)
+                                    if (o.has("diagnosisHint") && !o.isNull("diagnosisHint")) put("diagnosis_hint", o.getString("diagnosisHint"))
+                                    put("date_jalali_str", o.getString("dateJalaliStr"))
+                                    put("timestamp_millis", ts)
+                                    if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
+                                }
+                                db.insert("flock_mortality_logs", null, cv)
+                            }
+                        }
+                    }
+                }
+
+                // 6b. Bird Sales - aggregate without duplicates
+                if (root.has("flockBirdSales")) {
+                    val arr = root.getJSONArray("flockBirdSales")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val ts = o.getLong("timestampMillis")
+                        val fId = o.getLong("flockId")
+                        val exists = db.rawQuery(
+                            "SELECT COUNT(*) FROM flock_bird_sales WHERE flock_id = ? AND timestamp_millis = ?",
+                            arrayOf(fId.toString(), ts.toString())
+                        ).use { c -> c.moveToFirst() && c.getLong(0) > 0L }
                         if (!exists) {
                             val cv = ContentValues().apply {
                                 put("flock_id", fId)
                                 put("flock_name", o.getString("flockName"))
-                                put("count", o.getInt("count"))
-                                put("reason", o.getString("reason"))
-                                if (o.has("diagnosisHint") && !o.isNull("diagnosisHint")) put("diagnosis_hint", o.getString("diagnosisHint"))
+                                put("bird_count", o.getInt("birdCount"))
+                                put("bird_age_days", o.optInt("birdAgeDays", 1))
+                                if (o.has("liveWeightKg") && !o.isNull("liveWeightKg")) put("live_weight_kg", o.getDouble("liveWeightKg"))
+                                if (o.has("unitPriceTomans") && !o.isNull("unitPriceTomans")) put("unit_price_tomans", o.getDouble("unitPriceTomans"))
+                                put("total_revenue_tomans", o.optDouble("totalRevenueTomans", 0.0))
+                                if (o.has("buyerName") && !o.isNull("buyerName")) put("buyer_name", o.getString("buyerName"))
+                                if (o.has("linkedTransactionId") && !o.isNull("linkedTransactionId")) put("linked_transaction_id", o.getLong("linkedTransactionId"))
                                 put("date_jalali_str", o.getString("dateJalaliStr"))
                                 put("timestamp_millis", ts)
                                 if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
                             }
-                            db.insert("flock_mortality_logs", null, cv)
+                            db.insert("flock_bird_sales", null, cv)
+                        }
+                    }
+                }
+
+                // 6c. Bird Slaughters - aggregate without duplicates
+                if (root.has("flockBirdSlaughters")) {
+                    val arr = root.getJSONArray("flockBirdSlaughters")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val ts = o.getLong("timestampMillis")
+                        val fId = o.getLong("flockId")
+                        val exists = db.rawQuery(
+                            "SELECT COUNT(*) FROM flock_bird_slaughters WHERE flock_id = ? AND timestamp_millis = ?",
+                            arrayOf(fId.toString(), ts.toString())
+                        ).use { c -> c.moveToFirst() && c.getLong(0) > 0L }
+                        if (!exists) {
+                            val cv = ContentValues().apply {
+                                put("flock_id", fId)
+                                put("flock_name", o.getString("flockName"))
+                                put("bird_count", o.getInt("birdCount"))
+                                put("bird_age_days", o.optInt("birdAgeDays", 1))
+                                if (o.has("liveWeightKg") && !o.isNull("liveWeightKg")) put("live_weight_kg", o.getDouble("liveWeightKg"))
+                                if (o.has("carcassWeightKg") && !o.isNull("carcassWeightKg")) put("carcass_weight_kg", o.getDouble("carcassWeightKg"))
+                                put("date_jalali_str", o.getString("dateJalaliStr"))
+                                put("timestamp_millis", ts)
+                                if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
+                            }
+                            db.insert("flock_bird_slaughters", null, cv)
                         }
                     }
                 }
@@ -3057,23 +3625,86 @@ class AppDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper
                     }
                 }
 
-                // 13. Flock Mortality Logs (Part 1)
+                // 13. Flock Mortality Logs (Part 1 - route legacy LIVE_SALE to flock_bird_sales)
                 if (root.has("flockMortalityLogs")) {
                     val arr = root.getJSONArray("flockMortalityLogs")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val reasonStr = o.optString("reason", "DISEASE")
+                        if (reasonStr.equals("LIVE_SALE", ignoreCase = true)) {
+                            val cv = ContentValues().apply {
+                                put("flock_id", o.getLong("flockId"))
+                                put("flock_name", o.getString("flockName"))
+                                put("bird_count", o.getInt("count"))
+                                put("bird_age_days", 1)
+                                put("total_revenue_tomans", 0.0)
+                                put("date_jalali_str", o.getString("dateJalaliStr"))
+                                put("timestamp_millis", o.getLong("timestampMillis"))
+                                val noteText = o.optString("notes", "").ifBlank {
+                                    o.optString("diagnosisHint", "").ifBlank { "منتقل‌شده از بکاپ فروش زنده" }
+                                }
+                                put("notes", noteText)
+                            }
+                            db.insert("flock_bird_sales", null, cv)
+                        } else {
+                            val cv = ContentValues().apply {
+                                if (o.has("id") && o.getLong("id") > 0) put("id", o.getLong("id"))
+                                put("flock_id", o.getLong("flockId"))
+                                put("flock_name", o.getString("flockName"))
+                                put("count", o.getInt("count"))
+                                put("reason", reasonStr)
+                                if (o.has("diagnosisHint") && !o.isNull("diagnosisHint")) put("diagnosis_hint", o.getString("diagnosisHint"))
+                                put("date_jalali_str", o.getString("dateJalaliStr"))
+                                put("timestamp_millis", o.getLong("timestampMillis"))
+                                if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
+                            }
+                            db.insertWithOnConflict("flock_mortality_logs", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                        }
+                    }
+                }
+
+                // 13b. Flock Bird Sales
+                if (root.has("flockBirdSales")) {
+                    val arr = root.getJSONArray("flockBirdSales")
                     for (i in 0 until arr.length()) {
                         val o = arr.getJSONObject(i)
                         val cv = ContentValues().apply {
                             if (o.has("id") && o.getLong("id") > 0) put("id", o.getLong("id"))
                             put("flock_id", o.getLong("flockId"))
                             put("flock_name", o.getString("flockName"))
-                            put("count", o.getInt("count"))
-                            put("reason", o.getString("reason"))
-                            if (o.has("diagnosisHint") && !o.isNull("diagnosisHint")) put("diagnosis_hint", o.getString("diagnosisHint"))
+                            put("bird_count", o.getInt("birdCount"))
+                            put("bird_age_days", o.optInt("birdAgeDays", 1))
+                            if (o.has("liveWeightKg") && !o.isNull("liveWeightKg")) put("live_weight_kg", o.getDouble("liveWeightKg"))
+                            if (o.has("unitPriceTomans") && !o.isNull("unitPriceTomans")) put("unit_price_tomans", o.getDouble("unitPriceTomans"))
+                            put("total_revenue_tomans", o.optDouble("totalRevenueTomans", 0.0))
+                            if (o.has("buyerName") && !o.isNull("buyerName")) put("buyer_name", o.getString("buyerName"))
+                            if (o.has("linkedTransactionId") && !o.isNull("linkedTransactionId")) put("linked_transaction_id", o.getLong("linkedTransactionId"))
                             put("date_jalali_str", o.getString("dateJalaliStr"))
                             put("timestamp_millis", o.getLong("timestampMillis"))
                             if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
                         }
-                        db.insertWithOnConflict("flock_mortality_logs", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                        db.insertWithOnConflict("flock_bird_sales", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
+                }
+
+                // 13c. Flock Bird Slaughters
+                if (root.has("flockBirdSlaughters")) {
+                    val arr = root.getJSONArray("flockBirdSlaughters")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val cv = ContentValues().apply {
+                            if (o.has("id") && o.getLong("id") > 0) put("id", o.getLong("id"))
+                            put("flock_id", o.getLong("flockId"))
+                            put("flock_name", o.getString("flockName"))
+                            put("bird_count", o.getInt("birdCount"))
+                            put("bird_age_days", o.optInt("birdAgeDays", 1))
+                            if (o.has("liveWeightKg") && !o.isNull("liveWeightKg")) put("live_weight_kg", o.getDouble("liveWeightKg"))
+                            if (o.has("carcassWeightKg") && !o.isNull("carcassWeightKg")) put("carcass_weight_kg", o.getDouble("carcassWeightKg"))
+                            put("date_jalali_str", o.getString("dateJalaliStr"))
+                            put("timestamp_millis", o.getLong("timestampMillis"))
+                            if (o.has("notes") && !o.isNull("notes")) put("notes", o.getString("notes"))
+                        }
+                        db.insertWithOnConflict("flock_bird_slaughters", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
                     }
                 }
 

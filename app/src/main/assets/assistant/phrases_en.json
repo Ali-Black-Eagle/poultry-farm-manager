@@ -1,0 +1,124 @@
+{
+  "intents": {
+    "ADD_EGGS": [
+      "add <NUM> eggs",
+      "collected <NUM> eggs today",
+      "log <NUM> eggs yesterday",
+      "<NUM> trays today",
+      "<NUM> trays <DATE>",
+      "<NUM> cartons of eggs",
+      "add eggs",
+      "log eggs"
+    ],
+    "ADD_TRANSACTION": [
+      "add expense <MONEY> for feed",
+      "spent <MONEY> on medicine",
+      "sold eggs for <MONEY>",
+      "income <MONEY> egg sales",
+      "add expense",
+      "log transaction"
+    ],
+    "ADD_FEED_WATER": [
+      "add <NUM> kg feed to flock",
+      "refill <NUM> liters water",
+      "<NUM> kg feed",
+      "<NUM> liters water"
+    ],
+    "QUERY_FEED_WATER": [
+      "how much feed consumed today",
+      "when does water run out",
+      "feed remaining"
+    ],
+    "LOG_MORTALITY": [
+      "<NUM> dead birds in flock",
+      "log <NUM> mortality",
+      "<NUM> birds died today"
+    ],
+    "SELL_BIRDS": [
+      "sell <NUM> birds",
+      "sold <NUM> birds for <MONEY>",
+      "sold <NUM> chickens"
+    ],
+    "SLAUGHTER_BIRDS": [
+      "slaughter <NUM> birds",
+      "slaughter <NUM> birds weight <WEIGHT> carcass <WEIGHT>"
+    ],
+    "QUERY_MORTALITY": [
+      "how many dead birds this week",
+      "mortality rate today",
+      "flock mortality"
+    ],
+    "QUERY_FLOCKS": [
+      "how many birds in total",
+      "flock age",
+      "active flocks"
+    ],
+    "TRANSFER_BIRDS": [
+      "transfer <NUM> birds to flock",
+      "move <NUM> birds"
+    ],
+    "QUERY_WAREHOUSE": [
+      "warehouse stock",
+      "low stock items",
+      "how much feed in warehouse"
+    ],
+    "CONSUME_WAREHOUSE": [
+      "consume <NUM> kg from warehouse",
+      "use <NUM> kg feed"
+    ],
+    "DIAGNOSE_DISEASE": [
+      "chickens have white diarrhea",
+      "symptoms of newcastle disease",
+      "why are chickens coughing"
+    ],
+    "QUERY_MEDICATION": [
+      "dosage for oxytetracycline",
+      "withdrawal period for enrofloxacin",
+      "how to use tylosin"
+    ],
+    "ADD_SCHEDULE": [
+      "remind me vaccine tomorrow at 9 am",
+      "schedule task for flock"
+    ],
+    "QUERY_SCHEDULE": [
+      "today schedule",
+      "upcoming vaccines",
+      "today tasks"
+    ],
+    "QUERY_CONTACTS": [
+      "phone number of vet",
+      "feed supplier contact"
+    ],
+    "QUERY_WEATHER": [
+      "farm temperature",
+      "weather and ventilation"
+    ],
+    "QUERY_EGGS": [
+      "how many eggs today",
+      "eggs this week"
+    ],
+    "QUERY_FINANCE": [
+      "how much did i spend this month",
+      "profit this week"
+    ],
+    "UNDO_LAST": [
+      "undo",
+      "undo that",
+      "revert last"
+    ],
+    "OPEN_SCREEN": [
+      "open finance",
+      "open settings",
+      "open warehouse"
+    ],
+    "HELP": [
+      "help",
+      "commands"
+    ],
+    "GREETING": [
+      "hi",
+      "hello",
+      "hey"
+    ]
+  }
+}

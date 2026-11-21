@@ -31,6 +31,34 @@ data class BreedOption(
 
 object BreedCatalog {
 
+    val KNOWN_BREED_MAP = listOf(
+        "بلک استار" to ("بلک استار" to BirdSpecies.CHICKEN),
+        "بلکستار" to ("بلک استار" to BirdSpecies.CHICKEN),
+        "black star" to ("بلک استار" to BirdSpecies.CHICKEN),
+        "آمروک" to ("آمروک" to BirdSpecies.CHICKEN),
+        "امروک" to ("آمروک" to BirdSpecies.CHICKEN),
+        "پلیموث راک" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "پلیموث" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "پلیموت راک" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "پلیموت" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "پلیوت راک" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "پلیوت" to ("پلیموث راک" to BirdSpecies.CHICKEN),
+        "راس 308" to ("راس ۳۰۸" to BirdSpecies.CHICKEN),
+        "راس ۳۰۸" to ("راس ۳۰۸" to BirdSpecies.CHICKEN),
+        "راس" to ("راس ۳۰۸" to BirdSpecies.CHICKEN),
+        "کاب 500" to ("کاب ۵۰۰" to BirdSpecies.CHICKEN),
+        "کاب ۵۰۰" to ("کاب ۵۰۰" to BirdSpecies.CHICKEN),
+        "کاب" to ("کاب ۵۰۰" to BirdSpecies.CHICKEN),
+        "کاپ" to ("کاب ۵۰۰" to BirdSpecies.CHICKEN),
+        "لوهمن قهوه ای" to ("لوهمن قهوه‌ای" to BirdSpecies.CHICKEN),
+        "لوهمن سفید" to ("لوهمن سفید" to BirdSpecies.CHICKEN),
+        "لوهمن" to ("لوهمن قهوه‌ای" to BirdSpecies.CHICKEN),
+        "های لاین" to ("های‌لاین" to BirdSpecies.CHICKEN),
+        "هایلاین" to ("های‌لاین" to BirdSpecies.CHICKEN),
+        "آرین" to ("آرین" to BirdSpecies.CHICKEN),
+        "ارین" to ("آرین" to BirdSpecies.CHICKEN)
+    )
+
     val chickenBreeds = listOf(
         BreedOption("آمروک", BirdSpecies.CHICKEN, ProductionType.DUAL),
         BreedOption("تخمگذار لگهورن", BirdSpecies.CHICKEN, ProductionType.LAYER),

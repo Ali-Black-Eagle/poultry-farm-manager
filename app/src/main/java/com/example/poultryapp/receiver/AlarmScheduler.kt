@@ -1,6 +1,7 @@
 package com.example.poultryapp.receiver
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -24,6 +25,7 @@ object AlarmScheduler {
     const val EXTRA_TITLE = "extra_title"
     const val EXTRA_MESSAGE = "extra_message"
     const val EXTRA_TYPE = "extra_type"
+    const val EXTRA_ITEM_TYPE = "extra_item_type"
 
     /**
      * بررسی دسترسی به زمان‌بندی هشدارهای دقیق (Android 12+)
@@ -188,6 +190,7 @@ object AlarmScheduler {
             putExtra(EXTRA_TITLE, title)
             putExtra(EXTRA_MESSAGE, message)
             putExtra(EXTRA_TYPE, "CHARGE_WARNING")
+            putExtra(EXTRA_ITEM_TYPE, itemType.name)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -255,7 +258,9 @@ object AlarmScheduler {
 
     fun cancelAlarm(context: Context, requestCode: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val intent = Intent(context, AlarmReceiver::class.java)
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = ACTION_ALARM_TRIGGER
+        }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             requestCode,
@@ -264,6 +269,50 @@ object AlarmScheduler {
         )
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent)
+        }
+    }
+
+    fun cancelScheduleAlarms(context: Context, scheduleId: Long) {
+        cancelAlarm(context, scheduleId.toInt())
+        cancelAlarm(context, (scheduleId * 10).toInt())
+        for (dayIndex in 0..6) {
+            cancelAlarm(context, (scheduleId * 10 + dayIndex).toInt())
+        }
+    }
+
+    /**
+     * Cancels scheduled feed/water low & empty warning alarms for a flock.
+     */
+    fun cancelChargeWarningAlarms(
+        context: Context,
+        flockId: Long,
+        itemType: ChargeItemType? = null
+    ) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        val typeOffsets = when (itemType) {
+            ChargeItemType.FEED -> listOf(1)
+            ChargeItemType.WATER -> listOf(2)
+            null -> listOf(1, 2)
+        }
+        val stateOffsets = listOf(10, 20)
+        for (typeOffset in typeOffsets) {
+            for (stateOffset in stateOffsets) {
+                val reqCode = (flockId * 100 + stateOffset + typeOffset).toInt()
+                val intent = Intent(context, AlarmReceiver::class.java).apply {
+                    action = ACTION_CHARGE_WARNING
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    reqCode,
+                    intent,
+                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                )
+                if (pendingIntent != null) {
+                    alarmManager?.cancel(pendingIntent)
+                }
+                notificationManager?.cancel(reqCode)
+            }
         }
     }
 

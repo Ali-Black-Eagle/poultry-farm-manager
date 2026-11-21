@@ -62,7 +62,22 @@ object LiveFeedWaterNotificationManager {
     fun updateAllLowNotifications(context: Context): Boolean {
         createNotificationChannel(context)
         val db = AppDatabaseHelper.getInstance(context)
+        val feedWaterAlertsEnabled = db.getSetting("alert_feed_water", "true").toBoolean()
         val flocks = db.getAllFlocks()
+
+        if (!feedWaterAlertsEnabled) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            for (flock in flocks) {
+                notificationManager.cancel(getNotificationId(flock.id))
+                AlarmScheduler.cancelChargeWarningAlarms(context, flock.id)
+            }
+            for (item in db.getAllWarehouseItems()) {
+                notificationManager.cancel(70000 + item.id.toInt())
+            }
+            cancelNextLiveUpdate(context)
+            return false
+        }
+
         var anyLow = false
 
         for (flock in flocks) {
@@ -95,6 +110,12 @@ object LiveFeedWaterNotificationManager {
     ): Boolean {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notifId = getNotificationId(flock.id)
+
+        val feedWaterAlertsEnabled = db.getSetting("alert_feed_water", "true").toBoolean()
+        if (!feedWaterAlertsEnabled) {
+            notificationManager.cancel(notifId)
+            return false
+        }
 
         val latestFeedCharge = db.getLatestChargeForFlock(flock.id, ChargeItemType.FEED)
         val latestWaterCharge = db.getLatestChargeForFlock(flock.id, ChargeItemType.WATER)
@@ -266,17 +287,41 @@ object LiveFeedWaterNotificationManager {
         notificationManager.cancel(getNotificationId(flockId))
     }
 
+    fun cancelWarehouseNotification(context: Context, itemId: Long) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(70000 + itemId.toInt())
+    }
+
+    internal fun shouldNotifyWarehouseLowStock(
+        item: com.example.poultryapp.data.local.WarehouseItem,
+        daysRemaining: Double,
+        feedWaterAlertsEnabled: Boolean = true
+    ): Boolean {
+        if (!feedWaterAlertsEnabled) return false
+        if (item.category != com.example.poultryapp.data.local.WarehouseCategory.FEED) return false
+        if (item.minAlertThreshold <= 0.0) return false
+        return daysRemaining <= 3.0 || item.currentStock <= item.minAlertThreshold
+    }
+
     /**
-     * Checks warehouse feed stocks and notifies if stock will deplete in <= 3 days.
+     * Checks warehouse feed stocks and notifies if alerts are enabled on the item and stock is low.
      */
     fun checkAndNotifyWarehouseLowStock(context: Context) {
         val db = AppDatabaseHelper.getInstance(context)
         val warehouseItems = db.getAllWarehouseItems()
         val allFlocks = db.getAllFlocks()
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val feedWaterAlertsEnabled = db.getSetting("alert_feed_water", "true").toBoolean()
 
         for (item in warehouseItems) {
-            if (item.category != com.example.poultryapp.data.local.WarehouseCategory.FEED) continue
+            val notifId = 70000 + item.id.toInt()
+            if (!feedWaterAlertsEnabled ||
+                item.category != com.example.poultryapp.data.local.WarehouseCategory.FEED ||
+                item.minAlertThreshold <= 0.0
+            ) {
+                notificationManager.cancel(notifId)
+                continue
+            }
 
             val assignedFlocks = allFlocks.filter { it.id in item.assignedFlockIds }
             val customBreeds = db.getAllCustomBreeds()
@@ -284,9 +329,8 @@ object LiveFeedWaterNotificationManager {
             val dailyKg = assignedFlocks.sumOf { DailyNutritionEngine.calculateFlockRequirement(it, season = currentSeason, customBreeds = customBreeds).totalFeedGrams / 1000.0 }
 
             val daysRemaining = if (dailyKg > 0) item.currentStock / dailyKg else Double.MAX_VALUE
-            val isLow = daysRemaining <= 3.0 || (item.minAlertThreshold > 0.0 && item.currentStock <= item.minAlertThreshold)
+            val isLow = shouldNotifyWarehouseLowStock(item, daysRemaining, feedWaterAlertsEnabled)
 
-            val notifId = 70000 + item.id.toInt()
             if (isLow) {
                 val title = "⚠️ هشدار کمبود دان در انبار: ${item.name}"
                 val daysStr = if (daysRemaining < Double.MAX_VALUE) "${toPersianDigits(String.format(java.util.Locale.US, "%.1f", daysRemaining))} روز" else "نامشخص"
@@ -370,6 +414,12 @@ object LiveFeedWaterNotificationManager {
         chargedAmount: Double
     ) {
         val db = AppDatabaseHelper.getInstance(context)
+        val feedWaterAlertsEnabled = db.getSetting("alert_feed_water", "true").toBoolean()
+        if (!feedWaterAlertsEnabled) {
+            AlarmScheduler.cancelChargeWarningAlarms(context, flockId, itemType)
+            return
+        }
+
         val flock = db.getAllFlocks().find { it.id == flockId } ?: return
 
         // Do not schedule if tracking disabled for this item type

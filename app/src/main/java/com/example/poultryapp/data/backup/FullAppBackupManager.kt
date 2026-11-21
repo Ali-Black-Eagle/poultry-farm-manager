@@ -104,6 +104,14 @@ object FullAppBackupManager {
         }
         root.put("legacyGamePrefs", legacyPrefsObj)
 
+        // ۵. داده‌های دستیار هوشمند (پیام‌ها، گزارشات عملیات و عبارات یادگرفته‌شده)
+        try {
+            val assistantDb = com.example.poultryapp.assistant.data.AssistantDatabaseHelper.getInstance(context)
+            root.put("assistantData", assistantDb.exportToJson())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         return root
     }
 
@@ -313,6 +321,16 @@ object FullAppBackupManager {
                 if (!editor.commit()) {
                     rollback()
                     return false
+                }
+            }
+
+            // ۴. بازیابی تاریخچه و تنظیمات دستیار هوشمند
+            if (root.has("assistantData")) {
+                try {
+                    val assistantDb = com.example.poultryapp.assistant.data.AssistantDatabaseHelper.getInstance(context)
+                    assistantDb.importFromJson(root.getJSONObject("assistantData"))
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
 

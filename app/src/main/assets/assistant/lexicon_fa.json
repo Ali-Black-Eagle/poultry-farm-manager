@@ -1,0 +1,222 @@
+{
+  "intents": {
+    "ADD_EGGS": {
+      "triggers": [
+        {"word": "تخم", "weight": 0.5},
+        {"word": "تخم مرغ", "weight": 0.5},
+        {"word": "تخممرغ", "weight": 0.5},
+        {"word": "شانه", "weight": 0.6},
+        {"word": "شونه", "weight": 0.6},
+        {"word": "کارتن", "weight": 0.6},
+        {"word": "جمع کردم", "weight": 0.5},
+        {"word": "ثبت کن", "weight": 0.4},
+        {"word": "اضافه کن", "weight": 0.4},
+        {"word": "بنویس", "weight": 0.3},
+        {"word": "وارد کن", "weight": 0.3}
+      ]
+    },
+    "ADD_TRANSACTION": {
+      "triggers": [
+        {"word": "هزینه", "weight": 0.5},
+        {"word": "خرج", "weight": 0.5},
+        {"word": "خریدم", "weight": 0.5},
+        {"word": "خرید", "weight": 0.4},
+        {"word": "پرداخت", "weight": 0.4},
+        {"word": "دادم", "weight": 0.3},
+        {"word": "درآمد", "weight": 0.5},
+        {"word": "فروختم", "weight": 0.5},
+        {"word": "فروش", "weight": 0.4},
+        {"word": "تومان", "weight": 0.3},
+        {"word": "ریال", "weight": 0.3}
+      ]
+    },
+    "ADD_FEED_WATER": {
+      "triggers": [
+        {"word": "شارژ دان", "weight": 0.7},
+        {"word": "شارژ آب", "weight": 0.7},
+        {"word": "شارژ", "weight": 0.5},
+        {"word": "دان دادم", "weight": 0.6},
+        {"word": "آب دادم", "weight": 0.6},
+        {"word": "ریختم", "weight": 0.4},
+        {"word": "پر کردم", "weight": 0.4}
+      ]
+    },
+    "QUERY_FEED_WATER": {
+      "triggers": [
+        {"word": "مصرف دان", "weight": 0.7},
+        {"word": "مصرف آب", "weight": 0.7},
+        {"word": "کی تموم میشه", "weight": 0.7},
+        {"word": "ماندگاری دان", "weight": 0.7},
+        {"word": "چقدر دان خورده", "weight": 0.7},
+        {"word": "آب کی تموم میشه", "weight": 0.7}
+      ]
+    },
+    "LOG_MORTALITY": {
+      "triggers": [
+        {"word": "تلفات", "weight": 0.7},
+        {"word": "مرد", "weight": 0.5},
+        {"word": "مرده", "weight": 0.5},
+        {"word": "تلف شد", "weight": 0.6},
+        {"word": "کشته شد", "weight": 0.5}
+      ]
+    },
+    "SELL_BIRDS": {
+      "triggers": [
+        {"word": "فروش مرغ", "weight": 0.85},
+        {"word": "فروش پرنده", "weight": 0.85},
+        {"word": "فروش جوجه", "weight": 0.85},
+        {"word": "فروختم", "weight": 0.55},
+        {"word": "مرغ", "weight": 0.35},
+        {"word": "پرنده", "weight": 0.35}
+      ]
+    },
+    "SLAUGHTER_BIRDS": {
+      "triggers": [
+        {"word": "کشتار", "weight": 0.9},
+        {"word": "کشتارگاه", "weight": 0.85},
+        {"word": "ذبح", "weight": 0.9},
+        {"word": "سربریدم", "weight": 0.9},
+        {"word": "وزن لاشه", "weight": 0.6},
+        {"word": "لاشه", "weight": 0.5}
+      ]
+    },
+    "QUERY_MORTALITY": {
+      "triggers": [
+        {"word": "چند تا تلفات", "weight": 0.7},
+        {"word": "آمار تلفات", "weight": 0.7},
+        {"word": "تلفات امروز", "weight": 0.7},
+        {"word": "تلفات این هفته", "weight": 0.7}
+      ]
+    },
+    "QUERY_FLOCKS": {
+      "triggers": [
+        {"word": "چند تا مرغ داریم", "weight": 0.7},
+        {"word": "تعداد مرغ", "weight": 0.7},
+        {"word": "آمار سالن", "weight": 0.6},
+        {"word": "سن گله", "weight": 0.7},
+        {"word": "چند تا سالن داریم", "weight": 0.7},
+        {"word": "وضعیت گله", "weight": 0.6}
+      ]
+    },
+    "TRANSFER_BIRDS": {
+      "triggers": [
+        {"word": "انتقال مرغ", "weight": 0.8},
+        {"word": "انتقال پرنده", "weight": 0.8},
+        {"word": "انتقال از سالن", "weight": 0.8},
+        {"word": "جابجا کن", "weight": 0.6}
+      ]
+    },
+    "QUERY_WAREHOUSE": {
+      "triggers": [
+        {"word": "موجودی انبار", "weight": 0.7},
+        {"word": "چقدر دان داریم", "weight": 0.7},
+        {"word": "چقدر دان تو انباره", "weight": 0.7},
+        {"word": "کسری انبار", "weight": 0.7},
+        {"word": "موجودی دان", "weight": 0.7}
+      ]
+    },
+    "CONSUME_WAREHOUSE": {
+      "triggers": [
+        {"word": "مصرف از انبار", "weight": 0.7},
+        {"word": "از انبار برداشتم", "weight": 0.7},
+        {"word": "برداشت از انبار", "weight": 0.7}
+      ]
+    },
+    "DIAGNOSE_DISEASE": {
+      "triggers": [
+        {"word": "چه بیماریه", "weight": 0.8},
+        {"word": "تشخیص بیماری", "weight": 0.8},
+        {"word": "علائم بیماری", "weight": 0.7},
+        {"word": "مرغ ها عطسه میکنن", "weight": 0.7},
+        {"word": "اسهال دارن", "weight": 0.7}
+      ]
+    },
+    "QUERY_MEDICATION": {
+      "triggers": [
+        {"word": "دوز دارو", "weight": 0.8},
+        {"word": "دوز", "weight": 0.6},
+        {"word": "طریقه مصرف", "weight": 0.7},
+        {"word": "دوره پرهیز", "weight": 0.8},
+        {"word": "پرهیز دارویی", "weight": 0.8}
+      ]
+    },
+    "ADD_SCHEDULE": {
+      "triggers": [
+        {"word": "یادآور تنظیم کن", "weight": 0.8},
+        {"word": "یادآور", "weight": 0.6},
+        {"word": "برنامه ریزی کن", "weight": 0.7},
+        {"word": "واکسن بزنم", "weight": 0.6}
+      ]
+    },
+    "QUERY_SCHEDULE": {
+      "triggers": [
+        {"word": "برنامه امروز", "weight": 0.8},
+        {"word": "برنامه های امروز", "weight": 0.8},
+        {"word": "واکسن های امروز", "weight": 0.8},
+        {"word": "یادآورهای امروز", "weight": 0.8}
+      ]
+    },
+    "QUERY_CONTACTS": {
+      "triggers": [
+        {"word": "شماره تلفن", "weight": 0.8},
+        {"word": "شماره دامپزشک", "weight": 0.8},
+        {"word": "تلفن کارخانه", "weight": 0.8},
+        {"word": "مخاطبین", "weight": 0.6}
+      ]
+    },
+    "QUERY_WEATHER": {
+      "triggers": [
+        {"word": "دمای فارم", "weight": 0.8},
+        {"word": "دمای سالن", "weight": 0.8},
+        {"word": "هوای فارم", "weight": 0.7},
+        {"word": "وضعیت هوا", "weight": 0.7},
+        {"word": "تهویه سالن", "weight": 0.7}
+      ]
+    },
+    "QUERY_EGGS": {
+      "triggers": [
+        {"word": "چند تا تخم", "weight": 0.6},
+        {"word": "چقدر تخم", "weight": 0.6},
+        {"word": "آمار تخم", "weight": 0.5},
+        {"word": "تخم امروز", "weight": 0.5}
+      ]
+    },
+    "QUERY_FINANCE": {
+      "triggers": [
+        {"word": "چقدر خرج", "weight": 0.6},
+        {"word": "چقدر هزینه", "weight": 0.6},
+        {"word": "سود", "weight": 0.6},
+        {"word": "تراز مالی", "weight": 0.6},
+        {"word": "سود فروش", "weight": 0.7}
+      ]
+    },
+    "UNDO_LAST": {
+      "triggers": [
+        {"word": "برگردون", "weight": 0.8},
+        {"word": "برگردان", "weight": 0.8},
+        {"word": "اشتباه شد", "weight": 0.8},
+        {"word": "لغو کن", "weight": 0.7}
+      ]
+    },
+    "OPEN_SCREEN": {
+      "triggers": [
+        {"word": "برو به", "weight": 0.7},
+        {"word": "باز کن", "weight": 0.6},
+        {"word": "صفحه", "weight": 0.4}
+      ]
+    },
+    "HELP": {
+      "triggers": [
+        {"word": "راهنما", "weight": 0.8},
+        {"word": "کمک", "weight": 0.7},
+        {"word": "چه کارهایی", "weight": 0.7}
+      ]
+    },
+    "GREETING": {
+      "triggers": [
+        {"word": "سلام", "weight": 0.8},
+        {"word": "درود", "weight": 0.8}
+      ]
+    }
+  }
+}

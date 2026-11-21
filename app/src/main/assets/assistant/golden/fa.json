@@ -1,0 +1,107 @@
+[
+  {
+    "text": "امروز ۱۲۰ تا تخم مرغ اضافه کن",
+    "expectedIntent": "ADD_EGGS",
+    "expectedSlots": {
+      "COUNT": 120
+    }
+  },
+  {
+    "text": "۵ شانه امروز",
+    "expectedIntent": "ADD_EGGS",
+    "expectedSlots": {
+      "COUNT": 150
+    }
+  },
+  {
+    "text": "هزینه دان ۱ میلیون و ۵۰۰ هزار تومان ثبت کن",
+    "expectedIntent": "ADD_TRANSACTION",
+    "expectedSlots": {
+      "AMOUNT": 1500000.0
+    }
+  },
+  {
+    "text": "شارژ دان ۱۰۰ کیلو برای سالن",
+    "expectedIntent": "ADD_FEED_WATER",
+    "expectedSlots": {
+      "COUNT": 100
+    }
+  },
+  {
+    "text": "شارژ آب ۵۰۰ لیتر",
+    "expectedIntent": "ADD_FEED_WATER",
+    "expectedSlots": {
+      "COUNT": 500
+    }
+  },
+  {
+    "text": "تلفات ۵ قطعه در سالن به علت گرمازدگی",
+    "expectedIntent": "LOG_MORTALITY",
+    "expectedSlots": {
+      "COUNT": 5
+    }
+  },
+  {
+    "text": "۵۰ مرغ فروختم ۱۵ میلیون تومان",
+    "expectedIntent": "SELL_BIRDS",
+    "expectedSlots": {
+      "COUNT": 50,
+      "AMOUNT": 15000000.0
+    }
+  },
+  {
+    "text": "کشتار ۱۰۰ مرغ با وزن زنده ۲۴۰ کیلو و وزن لاشه ۱۷۵ کیلو",
+    "expectedIntent": "SLAUGHTER_BIRDS",
+    "expectedSlots": {
+      "COUNT": 100
+    }
+  },
+  {
+    "text": "تلفات این هفته چقدر بوده؟",
+    "expectedIntent": "QUERY_MORTALITY"
+  },
+  {
+    "text": "چند تا مرغ داریم؟",
+    "expectedIntent": "QUERY_FLOCKS"
+  },
+  {
+    "text": "موجودی انبار چقدره؟",
+    "expectedIntent": "QUERY_WAREHOUSE"
+  },
+  {
+    "text": "مرغ‌ها اسهال سفید و بی حالی دارند چه بیماریه؟",
+    "expectedIntent": "DIAGNOSE_DISEASE"
+  },
+  {
+    "text": "دوز داروی اکسی تتراسایکلین چقدره؟",
+    "expectedIntent": "QUERY_MEDICATION"
+  },
+  {
+    "text": "شماره تلفن دامپزشک چنده؟",
+    "expectedIntent": "QUERY_CONTACTS"
+  },
+  {
+    "text": "دمای هوای فارم چنده؟",
+    "expectedIntent": "QUERY_WEATHER"
+  },
+  {
+    "text": "امروز چند تا تخم داشتیم؟",
+    "expectedIntent": "QUERY_EGGS"
+  },
+  {
+    "text": "این ماه چقدر خرج کردم؟",
+    "expectedIntent": "QUERY_FINANCE"
+  },
+  {
+    "text": "برگردون اشتباه شد",
+    "expectedIntent": "UNDO_LAST"
+  },
+  {
+    "text": "راهنما",
+    "expectedIntent": "HELP"
+  },
+  {
+    "text": "سلام",
+    "expectedIntent": "GREETING"
+  }
+]

@@ -76,6 +76,8 @@ fun MainScreen(
     val rationPlans by viewModel.rationPlans.collectAsStateWithLifecycle()
     val customFeedIngredients by viewModel.customFeedIngredients.collectAsStateWithLifecycle()
     val mortalityLogs by viewModel.mortalityLogs.collectAsStateWithLifecycle()
+    val birdSales by viewModel.birdSales.collectAsStateWithLifecycle()
+    val birdSlaughters by viewModel.birdSlaughters.collectAsStateWithLifecycle()
     val farmContacts by viewModel.farmContacts.collectAsStateWithLifecycle()
     val biosecurityChecks by viewModel.biosecurityChecks.collectAsStateWithLifecycle()
     val userRole by viewModel.userRole.collectAsStateWithLifecycle()
@@ -92,6 +94,8 @@ fun MainScreen(
                 "FEED_WATER" -> FlocksSubTab.FEED_WATER
                 "CALENDAR" -> FlocksSubTab.CALENDAR
                 "EGG_PRODUCTION" -> FlocksSubTab.EGG_PRODUCTION
+                "MORTALITY" -> FlocksSubTab.MORTALITY
+                "SALES_SLAUGHTER" -> FlocksSubTab.SALES_SLAUGHTER
                 else -> FlocksSubTab.OVERVIEW
             }
         )
@@ -102,7 +106,7 @@ fun MainScreen(
     var currentTab by rememberSaveable {
         mutableStateOf(
             when (initialTargetTab) {
-                "FEED_WATER", "CALENDAR", "FLOCKS", "EGG_PRODUCTION" -> AppTab.FLOCKS
+                "FEED_WATER", "CALENDAR", "FLOCKS", "EGG_PRODUCTION", "MORTALITY", "SALES_SLAUGHTER" -> AppTab.FLOCKS
                 "HEALTH" -> AppTab.HEALTH
                 "SETTINGS" -> AppTab.SETTINGS
                 "WAREHOUSE", "MANAGEMENT", "FINANCIAL", "RATION_BUILDER" -> AppTab.MANAGEMENT
@@ -130,6 +134,14 @@ fun MainScreen(
                 flocksSubTab = FlocksSubTab.EGG_PRODUCTION
                 currentTab = AppTab.FLOCKS
             }
+            "MORTALITY" -> {
+                flocksSubTab = FlocksSubTab.MORTALITY
+                currentTab = AppTab.FLOCKS
+            }
+            "SALES_SLAUGHTER" -> {
+                flocksSubTab = FlocksSubTab.SALES_SLAUGHTER
+                currentTab = AppTab.FLOCKS
+            }
             "FLOCKS" -> {
                 flocksSubTab = FlocksSubTab.OVERVIEW
                 currentTab = AppTab.FLOCKS
@@ -152,11 +164,21 @@ fun MainScreen(
         }
     }
 
-    // Auto-refresh weather upon entering / resuming the app
+    // Auto-refresh weather and handle background auto-lock timeout upon entering / resuming the app
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, settings.autoLockTimeoutMinutes, settings.managerPinHash) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                val lastBg = com.example.poultryapp.MainActivity.lastBackgroundTimeMillis
+                if (lastBg > 0L) {
+                    val timeoutMillis = settings.autoLockTimeoutMinutes * 60 * 1000L
+                    if (System.currentTimeMillis() - lastBg > timeoutMillis) {
+                        if (settings.managerPinHash.isNotBlank()) {
+                            viewModel.switchToWorkerMode()
+                        }
+                    }
+                }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshWeather(forceOnline = true)
             }
         }
@@ -486,6 +508,34 @@ fun MainScreen(
                                             viewModel.logFlockMortality(flockId, count, reason, diagHint, notes, dateStr)
                                         },
                                         onDeleteMortality = { viewModel.deleteMortalityLog(it) },
+                                        birdSales = birdSales,
+                                        birdSlaughters = birdSlaughters,
+                                        onSellBirds = { flockId, count, liveWeightKg, unitPriceTomans, totalRevenueTomans, buyerName, dateStr, notes, createFinanceTx ->
+                                            viewModel.sellBirds(
+                                                flockId = flockId,
+                                                birdCount = count,
+                                                liveWeightKg = liveWeightKg,
+                                                unitPriceTomans = unitPriceTomans,
+                                                totalRevenueTomans = totalRevenueTomans,
+                                                buyerName = buyerName,
+                                                dateJalaliStr = dateStr,
+                                                notes = notes,
+                                                createFinanceTransaction = createFinanceTx
+                                            )
+                                        },
+                                        onDeleteBirdSale = { viewModel.deleteBirdSale(it) },
+                                        onSlaughterBirds = { flockId, count, birdAgeDays, liveWeightKg, carcassWeightKg, dateStr, notes ->
+                                            viewModel.slaughterBirds(
+                                                flockId = flockId,
+                                                birdCount = count,
+                                                birdAgeDays = birdAgeDays,
+                                                liveWeightKg = liveWeightKg,
+                                                carcassWeightKg = carcassWeightKg,
+                                                dateJalaliStr = dateStr,
+                                                notes = notes
+                                            )
+                                        },
+                                        onDeleteBirdSlaughter = { viewModel.deleteBirdSlaughter(it) },
                                         userRole = userRole,
                                         mortalityLogs = mortalityLogs,
                                         onDeleteEggProduction = { viewModel.deleteEggProduction(it) },
@@ -820,90 +870,50 @@ fun MainScreen(
     }
 
     if (showVoiceAssistantSheet) {
-        val farmLiveContext = remember(
-            flocks, eggProductions, mortalityLogs, warehouseItems,
-            financialTransactions, allFarmCharges, schedules, farmContacts, weatherResult
-        ) {
-            com.example.poultryapp.engine.FarmLiveContext(
-                flocks = flocks,
-                eggProductions = eggProductions,
-                mortalityLogs = mortalityLogs,
-                warehouseItems = warehouseItems,
-                financialTransactions = financialTransactions,
-                allFarmCharges = allFarmCharges,
-                schedules = schedules,
-                contacts = farmContacts,
-                weather = weatherResult
-            )
-        }
-
         com.example.poultryapp.voice.VoiceAssistantSheet(
-            flocks = flocks,
-            contacts = farmContacts,
-            eggProductions = eggProductions,
-            farmContext = farmLiveContext,
-            userRole = userRole,
+            isWorkerMode = (userRole == UserRole.WORKER),
             onDismiss = { showVoiceAssistantSheet = false },
-            onExecuteAction = { card ->
-                com.example.poultryapp.voice.VoiceActionDispatcher.dispatch(
-                    context = context,
-                    viewModel = viewModel,
-                    card = card,
-                    userRole = userRole,
-                    onNavigate = { targetTab ->
-                        when {
-                            targetTab.startsWith("DISEASE_DETAIL:") -> {
-                                val dId = targetTab.removePrefix("DISEASE_DETAIL:")
-                                val disease = com.example.poultryapp.data.model.DiseaseCatalog.allDiseases.find { it.id == dId }
-                                if (disease != null) {
-                                    selectedDiseaseDetail = disease
-                                } else {
-                                    healthSubTab = HealthSubTab.DIAGNOSIS
-                                    currentTab = AppTab.HEALTH
-                                }
-                            }
-                            targetTab == "HOME" -> currentTab = AppTab.HOME
-                            targetTab == "FLOCKS" -> currentTab = AppTab.FLOCKS
-                            targetTab == "FEED_WATER" -> currentTab = AppTab.FEED_WATER
-                            targetTab == "CALENDAR" -> currentTab = AppTab.CALENDAR
-                            targetTab == "GOLDEN_BREEDING" -> currentTab = AppTab.GOLDEN_BREEDING
-                            targetTab == "WAREHOUSE" -> {
-                                managementSubTab = ManagementSubTab.WAREHOUSE
-                                currentTab = AppTab.MANAGEMENT
-                            }
-                            targetTab == "FINANCIAL" -> {
-                                managementSubTab = ManagementSubTab.FINANCIAL
-                                currentTab = AppTab.MANAGEMENT
-                            }
-                            targetTab == "RATION" || targetTab == "RATION_BUILDER" -> {
-                                managementSubTab = ManagementSubTab.RATION_BUILDER
-                                currentTab = AppTab.MANAGEMENT
-                            }
-                            targetTab == "CONTACTS" -> {
-                                managementSubTab = ManagementSubTab.CONTACTS
-                                currentTab = AppTab.MANAGEMENT
-                            }
-                            targetTab == "HEALTH" -> {
-                                healthSubTab = HealthSubTab.DIAGNOSIS
-                                currentTab = AppTab.HEALTH
-                            }
-                            targetTab == "MEDICATIONS" -> {
-                                healthSubTab = HealthSubTab.DRUGS
-                                currentTab = AppTab.HEALTH
-                            }
-                            targetTab == "BIOSECURITY" -> {
-                                healthSubTab = HealthSubTab.BIOSECURITY
-                                currentTab = AppTab.HEALTH
-                            }
-                            targetTab == "SIMULATORS" -> {
-                                managementSubTab = ManagementSubTab.SIMULATORS
-                                currentTab = AppTab.MANAGEMENT
-                            }
-                            targetTab == "SETTINGS" -> currentTab = AppTab.SETTINGS
-                            targetTab == "KNOWLEDGE" -> currentTab = AppTab.BREEDING_GUIDE
+            onNavigate = { tab, subTab ->
+                showVoiceAssistantSheet = false
+                when (tab) {
+                    "HOME" -> currentTab = AppTab.HOME
+                    "FLOCKS" -> {
+                        currentTab = AppTab.FLOCKS
+                        when (subTab) {
+                            "MORTALITY" -> flocksSubTab = FlocksSubTab.MORTALITY
+                            "SALES_SLAUGHTER" -> flocksSubTab = FlocksSubTab.SALES_SLAUGHTER
+                            "FEED_WATER" -> flocksSubTab = FlocksSubTab.FEED_WATER
+                            "CALENDAR" -> flocksSubTab = FlocksSubTab.CALENDAR
+                            "EGG_PRODUCTION" -> flocksSubTab = FlocksSubTab.EGG_PRODUCTION
+                            else -> flocksSubTab = FlocksSubTab.OVERVIEW
                         }
                     }
-                )
+                    "MANAGEMENT" -> {
+                        currentTab = AppTab.MANAGEMENT
+                        when (subTab) {
+                            "WAREHOUSE" -> managementSubTab = ManagementSubTab.WAREHOUSE
+                            "FINANCIAL" -> managementSubTab = ManagementSubTab.FINANCIAL
+                            "RATION_BUILDER" -> managementSubTab = ManagementSubTab.RATION_BUILDER
+                            "CONTACTS" -> managementSubTab = ManagementSubTab.CONTACTS
+                            "SIMULATORS" -> managementSubTab = ManagementSubTab.SIMULATORS
+                            else -> managementSubTab = ManagementSubTab.WAREHOUSE
+                        }
+                    }
+                    "HEALTH" -> {
+                        currentTab = AppTab.HEALTH
+                        when (subTab) {
+                            "DIAGNOSIS" -> healthSubTab = HealthSubTab.DIAGNOSIS
+                            "DRUGS", "MEDICATIONS" -> healthSubTab = HealthSubTab.DRUGS
+                            "SUPPLEMENTS" -> healthSubTab = HealthSubTab.SUPPLEMENTS
+                            "BIOSECURITY" -> healthSubTab = HealthSubTab.BIOSECURITY
+                            "VET_CONSULT" -> healthSubTab = HealthSubTab.VET_CONSULT
+                            else -> healthSubTab = HealthSubTab.DIAGNOSIS
+                        }
+                    }
+                    "SETTINGS" -> currentTab = AppTab.SETTINGS
+                    "BREEDING_GUIDE" -> currentTab = AppTab.BREEDING_GUIDE
+                    "GOLDEN_BREEDING" -> currentTab = AppTab.GOLDEN_BREEDING
+                }
             }
         )
     }
