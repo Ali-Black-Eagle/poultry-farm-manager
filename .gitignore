@@ -28,3 +28,5 @@ keystore.properties
 .agents/
 .kotlin/
 scratch/
+.gemini/
+.idea/
